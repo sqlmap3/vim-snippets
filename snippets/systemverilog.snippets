@@ -8,113 +8,86 @@
 # FILE TEMPLATES AND HEADERS
 # =============================================================================
 
-snippet sv_header "SystemVerilog file header"
-	//==============================================================================
-	// File        : ${1:`expand('%:t')`}
-	// Project     : ${2:Project Name}
-	// Module      : ${3:`expand('%:t:r')`}
-	// Author      : ${4:$USER}
-	// Created     : ${5:`strftime("%Y-%m-%d")`}
-	// Modified    : ${6:`strftime("%Y-%m-%d")`}
-	//==============================================================================
+# ============================================================================
+# FILE HEADER
+# ============================================================================
+snippet header "File Header"
+	// ===========================================================================
+	// File    : ${1:$TM_FILENAME}
+	// Project : ${2:Project Name}
+	// Module  : ${3:$TM_FILENAME_BASE}
+	// Author  : ${4:$USER}
+	// Created : ${5:`strftime("%Y-%m-%d")`}
+	// ===========================================================================
 	// Description:
-	//   ${7:Brief description}
-	//==============================================================================
+	//   ${6:Brief description of the module}
+	// ===========================================================================
 	
 	${0}
 
-snippet header_guard "Header guard"
-	\`ifndef ${1:`toupper(substitute(expand('%:t:r'), '[^A-Z0-9]', '_', 'g'))`}_SVH
+# ============================================================================
+# HEADER GUARD
+# Auto-converts filename to UPPERCASE (e.g. my_agent -> MY_AGENT)
+# ============================================================================
+snippet header_guard "Header Guard (Auto Uppercase)"
+	\`ifndef ${1:${TM_FILENAME_BASE/(.*)/${1:/upcase}/}}_SVH
 	\`define $1_SVH
 	
 	${0}
 	
 	\`endif // $1_SVH
 
-snippet tb "Testbench template"
+# ============================================================================
+# TESTBENCH TEMPLATE
+# Uses $TM_FILENAME_BASE for module name.
+# Auto-links dump file name to module name ($1).
+# ============================================================================
+snippet tb "Testbench template (Universal)"
 	\`timescale 1ns/1ps
 	
-	module ${1:`expand('%:t:r')`};
+	module ${1:$TM_FILENAME_BASE};
 	
-	    localparam int PERIOD = ${2:10};
-	    
-	    logic ${3:clk};
-	    logic ${4:rst_n};
-	    ${5}
+		localparam int PERIOD = ${2:10};
 	
-	    // Clock generation
-	    initial begin
-	        $3 = 0;
-	        forever #(PERIOD/2) $3 = ~$3;
-	    end
+		logic ${3:clk};
+		logic ${4:rst_n};
+		${5}
 	
-	    // Reset generation
-	    initial begin
-	        $4 = 0;
-	        repeat(2) @(posedge $3);
-	        $4 = 1;
-	    end
+		// Clock generation
+		initial begin
+			$3 = 0;
+			forever #(PERIOD/2) $3 = ~$3;
+		end
 	
-	    // DUT instantiation
-	    ${6:dut} u_dut (
-	        .clk($3),
-	        .rst_n($4)${7}
-	    );
+		// Reset generation
+		initial begin
+			$4 = 0;
+			repeat(2) @(posedge $3);
+			$4 = 1;
+		end
 	
-	    // Test stimulus
-	    initial begin
-	        @(posedge $4);
-	        ${0}
-	        #1000;
-	        \$finish;
-	    end
+		// DUT instantiation
+		${6:dut_name} u_dut (
+			.${3:clk_port}($3),
+			.${4:rst_port}($4)${7}
+		);
 	
-	    // Waveform dump
-	    initial begin
-	        \$dumpfile("${8:`expand('%:t:r')`}.vcd");
-	        \$dumpvars(0, $1);
-	    end
+		// Test stimulus
+		initial begin
+			@(posedge $4);
+			${0}
+			#1000;
+			\`uvm_info("TB", "Test Finished", UVM_LOW)
+			\$finish;
+		end
+	
+		// Waveform dump
+		initial begin
+			\$dumpfile("${1}.vcd");
+			\$dumpvars(0, $1);
+		end
 	
 	endmodule: $1
-
-# =============================================================================
-# MODULE AND INTERFACE DEFINITIONS
-# =============================================================================
-
-snippet module "Module definition"
-	module ${1:`expand('%:t:r')`} #(
-	    parameter int ${2:WIDTH} = ${3:8}
-	) (
-	    input  logic ${4:clk},
-	    input  logic ${5:rst_n},
-	    ${6}
-	);
-	    ${0}
-	endmodule: $1
-
-snippet interface "Interface definition"
-	interface ${1:`expand('%:t:r')`} (
-	    input logic clk,
-	    input logic rst_n
-	);
-	    ${2}
-	endinterface: $1
-
-snippet modport "Modport declaration"
-	modport ${1:`expand('%:t:r')`}_mp (
-	    ${2:input clk}
-	);
-
-snippet package "Package definition"
-	package ${1:`expand('%:t:r')`}_pkg;
-	    ${2}
-	endpackage: $1_pkg
-
-snippet program "Program block"
-	program ${1:`expand('%:t:r')`};
-	    ${2}
-	endprogram: $1
-
 # =============================================================================
 # DATA TYPES
 # =============================================================================
@@ -137,33 +110,41 @@ snippet byte "Byte declaration"
 snippet int "Int declaration"
 	int ${1:variable};
 
+# ============================================================================
+# PARAMETERS & LOCALPARAMS
+# Note: Defaults to PARAM_NAME (Uppercase convention)
+# ============================================================================
 snippet parameter "Parameter declaration"
-	parameter ${1:int} ${2:`toupper(expand('%:t:r'))`} = ${3:value};
+	parameter ${1:int} ${2:PARAM_NAME} = ${3:0};
 
 snippet localparam "Localparam declaration"
-	localparam ${1:int} ${2:`toupper(expand('%:t:r'))`} = ${3:value};
+	localparam ${1:int} ${2:PARAM_NAME} = ${3:0};
 
+# ============================================================================
+# TYPEDEFS (Structs, Enums, Unions)
+# Auto-names based on filename (e.g. file: my_packet.sv -> my_packet_s)
+# ============================================================================
 snippet typedef_struct "Typedef struct"
 	typedef struct packed {
-	    ${2}
-	} ${1:`expand('%:t:r')`}_s;
-
-snippet typedef_enum "Typedef enum"
-	typedef enum logic ${1:[1:0]} {
-	    ${2:IDLE}   = ${3:2'b00},
-	    ${4:ACTIVE} = ${5:2'b01}
-	} ${6:`expand('%:t:r')`}_e;
+		${2:// data}
+	} ${1:$TM_FILENAME_BASE}_s;
 
 snippet typedef_union "Typedef union"
 	typedef union packed {
-	    ${2}
-	} ${1:`expand('%:t:r')`}_u;
+		${2:// data}
+	} ${1:$TM_FILENAME_BASE}_u;
 
-snippet enum "Enum definition"
+snippet typedef_enum "Typedef enum (Explicit encoding)"
+	typedef enum logic ${1:[1:0]} {
+		${2:IDLE}   = ${3:2'b00},
+		${4:ACTIVE} = ${5:2'b01}
+	} ${6:$TM_FILENAME_BASE}_e;
+
+snippet enum "Enum definition (Auto encoding)"
 	typedef enum ${1:logic} {
-	    ${2:IDLE},
-	    ${3:ACTIVE}
-	} ${4:`expand('%:t:r')`}_e;
+		${2:IDLE},
+		${3:ACTIVE}
+	} ${4:$TM_FILENAME_BASE}_e;
 
 # =============================================================================
 # ARRAYS
@@ -316,92 +297,107 @@ snippet forever "Forever loop"
 # =============================================================================
 
 snippet function "Function definition"
-	function ${1:void} ${2:`expand('%:t:r')`}(${3});
-	    ${4}
+	function ${1:void} ${2:name}(${3});
+		${0}
 	endfunction: $2
 
 snippet task "Task definition"
-	task ${1:`expand('%:t:r')`}(${2});
-	    ${3}
+	task ${1:name}(${2});
+		${0}
 	endtask: $1
 
-snippet extern_function "Extern function"
-	extern function ${1:return_type} ${2:`expand('%:t:r')`}(${3});
+snippet extern_function "Extern function declaration"
+	extern function ${1:void} ${2:name}(${3});
 
-snippet extern_task "Extern task"
-	extern task ${1:`expand('%:t:r')`}(${2});
+snippet extern_task "Extern task declaration"
+	extern task ${1:name}(${2});
 
 # =============================================================================
 # CLASSES
 # =============================================================================
 
+
 snippet class "Class definition"
-	class ${1:`expand('%:t:r')`};
-	    ${2}
+	class ${1:$TM_FILENAME_BASE};
+		${2:// properties}
 	
-	    function new(string name = "$1");
-	        ${3}
-	    endfunction: new
+		function new(string name = "$1");
+			${3}
+		endfunction: new
 	
 	endclass: $1
 
 snippet class_param "Parameterized class"
-	class ${1:`expand('%:t:r')`} #(
-	    parameter int ${2:WIDTH} = ${3:8}
+	class ${1:$TM_FILENAME_BASE} #(
+		parameter int ${2:WIDTH} = ${3:8}
 	);
-	    ${4}
+		${4:// properties}
 	
-	    function new(string name = "$1");
-	        ${5}
-	    endfunction: new
+		function new(string name = "$1");
+			${5}
+		endfunction: new
 	
 	endclass: $1
 
-snippet virtual_class "Virtual class"
-	virtual class ${1:`expand('%:t:r')`};
-	    ${2}
-	    pure virtual function ${3:void} ${4:method}();
+snippet virtual_class "Virtual class (Abstract)"
+	virtual class ${1:$TM_FILENAME_BASE};
+		${2}
+		pure virtual function ${3:void} ${4:method_name}();
 	endclass: $1
+
+# ============================================================================
+# CLASS KEYWORDS
+# ============================================================================
 
 snippet extends "Extends"
 	extends ${1:base_class}
 
-snippet static "Static"
+snippet static "Static property"
 	static ${1:type} ${2:name};
 
-snippet protected "Protected"
+snippet protected "Protected property"
 	protected ${1:type} ${2:name};
 
-snippet local "Local"
+snippet local "Local property"
 	local ${1:type} ${2:name};
 
-# =============================================================================
-# CONCURRENCY
-# =============================================================================
+# ============================================================================
+# IPC & CONCURRENCY (Fork-Join, Events, Mailbox)
+# ============================================================================
 
-snippet fork "Fork-join"
+snippet fork "Fork-join (All threads finish)"
 	fork
-	    begin
-	        ${1}
-	    end
-	    begin
-	        ${2}
-	    end
+		begin
+			${1}
+		end
+		begin
+			${2}
+		end
 	join
 
-snippet fork_join_any "Fork-join_any"
+snippet fork_any "Fork-join_any (One thread finishes)"
 	fork
-	    begin
-	        ${1}
-	    end
+		begin
+			${1}
+		end
+		begin
+			${2}
+		end
 	join_any
 
-snippet fork_join_none "Fork-join_none"
+snippet fork_none "Fork-join_none (Non-blocking)"
 	fork
-	    begin
-	        ${1}
-	    end
+		begin
+			${1}
+		end
+		begin
+			${2}
+		end
 	join_none
+
+# ============================================================================
+# SYNCHRONIZATION
+# ============================================================================
 
 snippet wait "Wait statement"
 	wait (${1:condition});
@@ -412,940 +408,956 @@ snippet event "Event declaration"
 snippet trigger "Trigger event"
 	-> ${1:event_name};
 
-snippet mailbox "Mailbox"
-	mailbox #(${1:type}) ${2:mbx} = new(${3:bound});
+snippet wait_event "Wait for event (@)"
+	@(${1:event_name});
 
-snippet semaphore "Semaphore"
-	semaphore ${1:sem} = new(${2:count});
+snippet wait_order "Wait for event order"
+	wait_order( ${1:a}, ${2:b}, ${3:c} )
+		else \`uvm_error("ORDER", "Events out of order");
 
-# =============================================================================
+# ============================================================================
+# COMMUNICATION (Mailbox, Semaphore)
+# ============================================================================
+
+snippet mailbox "Mailbox declaration"
+	mailbox #(${1:logic}) ${2:mbx} = new(${3:1});
+
+snippet semaphore "Semaphore declaration"
+	semaphore ${1:key} = new(${2:1});
+
+# ============================================================================
 # RANDOMIZATION AND CONSTRAINTS
-# =============================================================================
+# ============================================================================
 
-snippet randomize "Randomize with"
-	assert (${1:object}.randomize() with {
-	    ${2:constraints}
-	});
+snippet randomize "Randomize with (Safety Check)"
+	if (!${1:this}.randomize() with {
+		${2:// constraints}
+	}) begin
+		\`uvm_fatal("RNDFAIL", "Randomization failed for $1")
+	end
 
 snippet constraint "Constraint block"
 	constraint ${1:name}_c {
-	    ${2}
+		${2}
 	}
 
-snippet dist "Distribution"
+snippet dist "Distribution (:= Weight per value)"
 	${1:variable} dist {
-	    ${2:value1} := ${3:weight1},
-	    ${4:value2} := ${5:weight2}
+		${2:value1} := ${3:weight1},
+		${4:value2} := ${5:weight2}
 	};
 
-snippet solve_before "Solve before"
-	solve ${1:var1} before ${2:var2};
+snippet dist_range "Distribution (:/ Weight over range)"
+	${1:variable} dist {
+		[${2:start}:${3:end}] :/ ${4:weight}
+	};
+
+snippet solve_before "Solve before (Ordering)"
+	solve ${1:order_var} before ${2:dependent_var};
 
 snippet soft "Soft constraint"
 	soft ${1:variable} == ${2:value};
 
 snippet inside "Inside constraint"
-	${1:variable} inside {${2:range}};
+	${1:variable} inside { [${2:min}:${3:max}] };
 
-snippet randcase "Randcase"
+snippet randcase "Randcase statement"
 	randcase
-	    ${1:weight1}: ${2:stmt1};
-	    ${3:weight2}: ${4:stmt2};
+		${1:weight1}: ${2:stmt1};
+		${3:weight2}: ${4:stmt2};
 	endcase
 
-# =============================================================================
-# COVERAGE
-# =============================================================================
+# ============================================================================
+# RANDOMIZATION HOOKS
+# ============================================================================
 
-snippet covergroup "Covergroup"
-	covergroup ${1:`expand('%:t:r')`}_cg @(${2:posedge clk});
-	    option.per_instance = 1;
-	    ${3}
-	endgroup: $1_cg
+snippet pre_randomize "pre_randomize function"
+	function void pre_randomize();
+		${1:super.pre_randomize();}
+	endfunction
 
-snippet coverpoint "Coverpoint"
-	${1:signal}_cp: coverpoint ${2:signal} {
-	    bins low  = {[0:${3:127}]};
-	    bins high = {[${4:128}:255]};
+snippet post_randomize "post_randomize function"
+	function void post_randomize();
+		${1:super.post_randomize();}
+	endfunction
+
+# ============================================================================
+# FUNCTIONAL COVERAGE
+# ============================================================================
+
+snippet covergroup "Covergroup definition"
+	covergroup ${1:cg_name} @(${2:posedge clk});
+		option.per_instance = 1;
+		option.comment = "$1";
+		
+		${3:// coverpoints}
+	endgroup: $1
+
+snippet coverpoint "Coverpoint definition"
+	${1:cp_name}: coverpoint ${2:signal_expr} {
+		bins low  = {[0:${3:32}]};
+		bins high = {[${4:33}:$]};
+		${5}
 	}
 
 snippet cross "Cross coverage"
-	${1:name}_cross: cross ${2:cp1}, ${3:cp2};
+	${1:cross_name}: cross ${2:cp_name1}, ${3:cp_name2} {
+		${4:// ignore_bins ...}
+	}
 
-snippet bins "Bins"
-	bins ${1:name} = {${2:values}};
+# ============================================================================
+# BINS DEFINITIONS
+# ============================================================================
 
-snippet ignore_bins "Ignore bins"
-	ignore_bins ${1:name} = {${2:values}};
+snippet bins "Bins (Simple Values)"
+	bins ${1:bin_name} = {${2:values}};
 
-snippet illegal_bins "Illegal bins"
-	illegal_bins ${1:name} = {${2:values}};
+snippet bins_range "Bins (Auto Range [])"
+	// Creates separate bin for each value in range
+	bins ${1:bin_name}[] = {[${2:0}:${3:3}]};
 
-# =============================================================================
-# ASSERTIONS
-# =============================================================================
+snippet bins_trans "Bins (Transition =>)"
+	bins ${1:trans_name} = (${2:0} => ${3:1});
 
-snippet assert "Assertion"
+snippet ignore_bins "Ignore bins (Don't count)"
+	ignore_bins ${1:ign_name} = {${2:values}};
+
+snippet illegal_bins "Illegal bins (Error if hit)"
+	illegal_bins ${1:ill_name} = {${2:values}};
+
+snippet wildcard_bins "Wildcard bins"
+	wildcard bins ${1:name} = {${2:4'b11??}};
+
+
+# ============================================================================
+# SVA (SYSTEMVERILOG ASSERTIONS)
+# ============================================================================
+
+snippet assert "Immediate Assertion"
 	assert (${1:condition}) else \$error("${2:Assertion failed}");
 
-snippet property "Property"
-	property ${1:`expand('%:t:r')};
-	    @(posedge ${2:clk}) ${3:condition};
+snippet property "Property Definition"
+	property ${1:prop_name};
+		@(posedge ${2:clk}) disable iff (!${3:rst_n})
+		${4:condition};
 	endproperty: $1
 
-snippet sequence "Sequence"
-	sequence ${1:`expand('%:t:r')};
-	    ${2}
+snippet sequence "Sequence Definition"
+	sequence ${1:seq_name};
+		${2:req} ##${3:1} ${4:ack};
 	endsequence: $1
 
-snippet assume "Assume"
-	assume property (${1:property_name});
+snippet assume "Assume Property (Formal/Constraint)"
+	assume property (@(posedge ${1:clk}) ${2:property_expr});
 
-snippet cover "Cover property"
-	cover property (${1:property_name});
+snippet cover "Cover Property (Functional Coverage)"
+	cover property (@(posedge ${1:clk}) ${2:property_expr});
 
-snippet sva "SVA property"
-	property ${1:prop_name};
-	    @(posedge ${2:clk}) disable iff (!${3:rst_n})
-	    ${4:sequence};
-	endproperty
+# ============================================================================
+# COMPLETE SVA BLOCK (Property + Assert)
+# ============================================================================
+snippet sva "Full SVA Check"
+	property ${1:prop_name}_p;
+		@(posedge ${2:clk}) disable iff (!${3:rst_n})
+		${4:req} |-> ${5:ack};
+	endproperty: $1_p
 	
-	assert_$1: assert property ($1)
-	    else \$error("$1 failed at %0t", \$time);
+	${6:a}_$1: assert property ($1_p)
+		else \$error("Assertion $1 failed: %0t", \$time);
 
-snippet implication "Implication"
+# ============================================================================
+# SVA OPERATORS & FUNCTIONS
+# ============================================================================
+
+# --- Implication () ---
+snippet impl_over "Overlapping Implication (|-> Same Cycle)"
 	${1:antecedent} |-> ${2:consequent}
 
-snippet overlapping "Overlapping implication"
+snippet impl_nonover "Non-overlapping Implication (|=> Next Cycle)"
 	${1:antecedent} |=> ${2:consequent}
 
-# =============================================================================
-# GENERATE
-# =============================================================================
+# --- Sequence Composition () ---
+snippet throughout "Throughout (Expr holds during Seq)"
+	(${1:expression}) throughout (${2:sequence})
 
-snippet generate "Generate for"
+snippet within "Within (Seq1 fits inside Seq2)"
+	(${1:short_seq}) within (${2:long_seq})
+
+snippet intersect "Intersect (Both start/end same time)"
+	(${1:seq1}) intersect (${2:seq2})
+
+snippet first_match "First Match (Discard later matches)"
+	first_match(${1:sequence})
+
+# --- Sample Value Functions () ---
+snippet rose "Rise ($rose - 0 to 1)"
+	$rose(${1:signal})
+
+snippet fell "Fell ($fell - 1 to 0)"
+	$fell(${1:signal})
+
+snippet stable "Stable ($stable - No change)"
+	$stable(${1:signal})
+
+snippet past "Past ($past - Value N cycles ago)"
+	$past(${1:signal}, ${2:1})
+
+snippet onehot "Onehot ($onehot)"
+	$onehot(${1:signal})
+# ============================================================================
+# GENERATE CONSTRUCTS
+# ============================================================================
+
+snippet generate "Generate For Loop"
 	generate
-	    for (genvar ${1:i} = 0; $1 < ${2:N}; $1++) begin : ${3:gen_block}
-	        ${4}
-	    end
+		for (genvar ${1:i} = 0; $1 < ${2:N}; $1++) begin : ${3:gen_blk}
+			${4}
+		end
 	endgenerate
 
-snippet generate_if "Generate if"
+snippet generate_if "Generate If"
 	generate
-	    if (${1:condition}) begin : ${2:gen_label}
-	        ${3}
-	    end
+		if (${1:CONDITION}) begin : ${2:gen_blk}
+			${3}
+		end
 	endgenerate
 
-snippet genvar "Genvar"
+snippet generate_case "Generate Case"
+	generate
+		case (${1:CONDITION})
+			${2:VAL_A}: begin : ${3:blk_a}
+				${4}
+			end
+			default: begin : ${5:blk_def}
+				${6}
+			end
+		endcase
+	endgenerate
+
+snippet genvar "Genvar Declaration"
 	genvar ${1:i};
 
-# =============================================================================
+# ============================================================================
 # INSTANTIATION
-# =============================================================================
+# ============================================================================
 
-snippet inst "Module instantiation"
+snippet inst "Module Instantiation"
 	${1:module_name} #(
-	    .${2:PARAM}(${3:VALUE})
-	) ${4:u_${1/([a-z]+).*/$1/}} (
-	    .${5:clk}(${6:clk}),
-	    .${7:rst_n}(${8:rst_n})${9}
+		.${2:PARAM_NAME}(${3:VALUE})
+	) ${4:u_$1} (
+		.${5:clk}(${6:clk}),
+		.${7:rst_n}(${8:rst_n})${9}
+	);
+
+snippet inst_simple "Module Instantiation (No Params)"
+	${1:module_name} ${2:u_$1} (
+		.${3:clk}(${4:clk}),
+		.${5:rst_n}(${6:rst_n})${7}
 	);
 
 snippet port "Port connection"
-	.${1:port}(${2:signal})${3:,}
+	.${1:port_name}(${2:signal_name})${3:,}
 
-snippet bind "Bind statement"
-	bind ${1:instance} ${2:module} ${3:bind_inst} (${4});
+snippet bind "Bind statement (SVA Binding)"
+	bind ${1:target_module_or_instance} ${2:checker_module} ${3:u_checker} (
+		.${4:port}(${5:sig})
+	);
 
-# =============================================================================
-# CLOCKING
-# =============================================================================
+# ============================================================================
+# CLOCKING BLOCK
+# Defines timing and synchronization for interfaces
+# ============================================================================
 
 snippet clocking "Clocking block"
-	clocking ${1:`expand('%:t:r')`}_cb @(posedge ${2:clk});
-	    default input #1step output #1ns;
-	    ${3}
+	clocking ${1:cb} @(posedge ${2:clk});
+		default input #1step output #${3:1ns};
+		
+		input  ${4:signal_in};
+		output ${5:signal_out};
 	endclocking: $1
 
-# =============================================================================
+# ============================================================================
 # PREPROCESSOR DIRECTIVES
-# =============================================================================
+# ============================================================================
 
 snippet define "Define macro"
-	\`define ${1:`toupper(expand('%:t:r'))`} ${2:value}
+	\`define ${1:MACRO_NAME} ${2:value}
 
-snippet ifdef "Ifdef"
-	\`ifdef ${1:`toupper(expand('%:t:r'))`}
-	    ${2}
+snippet ifdef "If defined"
+	\`ifdef ${1:MACRO_NAME}
+		${2}
 	\`endif
 
-snippet ifndef "Ifndef"
-	\`ifndef ${1:`toupper(expand('%:t:r'))`}
-	    ${2}
+snippet ifndef "If not defined"
+	\`ifndef ${1:MACRO_NAME}
+		${2}
 	\`endif
 
-snippet include "Include"
+snippet elsif "Else if (Preprocessor)"
+	\`elsif ${1:MACRO_NAME}
+		${2}
+
+snippet include "Include file"
 	\`include "${1:filename.svh}"
 
-snippet timescale "Timescale"
+snippet timescale "Timescale directive"
 	\`timescale ${1:1ns}/${2:1ps}
 
-# =============================================================================
+snippet default_nettype "Default Nettype"
+	\`default_nettype ${1:none}
+
+# ============================================================================
 # SYSTEM TASKS
-# =============================================================================
+# ============================================================================
 
-snippet display "Display"
-	\$display("${1:message
+snippet display "Display message"
+	\$display("${1:msg}: %${2:d}", ${3:signal});
 
-snippet monitor "Monitor"
-	\$monitor("Time=%0t: ${1:signal}=%0d", \$time, ${2:signal});
+snippet display_time "Display with Time"
+	\$display("[%0t] ${1:msg}", \$time, ${2:args});
 
-snippet finish "Finish"
+snippet monitor "Monitor signals"
+	\$monitor("[%0t] ${1:signal} = %${2:h}", \$time, ${3:signal});
+
+snippet finish "Finish simulation"
 	\$finish;
 
-snippet stop "Stop"
+snippet stop "Stop simulation"
 	\$stop;
 
-snippet readmemh "Readmemh"
-	\$readmemh("${1:file.hex}", ${2:memory});
+snippet fatal "UVM Fatal / Fatal"
+	\$fatal(${1:0}, "${2:Fatal error message}");
 
-snippet fopen "Fopen"
-	integer ${1:fh};
-	$1 = \$fopen("${2:file.txt}", "${3:w}");
+snippet error "UVM Error / Error"
+	\$error("${1:Error message}");
 
-snippet sformatf "Sformatf"
-	\$sformatf("${1:format}", ${2:args})
+snippet readmemh "Readmemh (Load Memory)"
+	\$readmemh("${1:file.hex}", ${2:memory_array});
 
-snippet urandom "Urandom"
+snippet readmemb "Readmemb (Binary)"
+	\$readmemb("${1:file.bin}", ${2:memory_array});
+
+snippet fopen "File Open"
+	integer ${1:fd};
+	$1 = \$fopen("${2:filename.txt}", "${3:w}");
+
+snippet fclose "File Close"
+	\$fclose(${1:fd});
+
+snippet sformatf "String Format"
+	\$sformatf("${1:format_str}", ${2:args})
+
+snippet urandom "Unsigned Random"
 	\$urandom()
 
-snippet urandom_range "Urandom_range"
+snippet urandom_range "Random Range"
 	\$urandom_range(${1:max}, ${2:min})
 
-snippet cast "Cast"
-	\$cast(${1:dest}, ${2:source})
+snippet cast "Dynamic Cast (Safe)"
+	if (!\$cast(${1:dest_handle}, ${2:src_handle})) begin
+		\$fatal(1, "Cast failed: $2 to $1");
+	end
 
-# =============================================================================
-# FSM TEMPLATE
-# =============================================================================
+snippet test_plusargs "Test Plusargs"
+	if (\$test\$plusargs("${1:ARG_NAME}")) begin
+		${2}
+	end
 
-snippet fsm "FSM template"
+snippet value_plusargs "Value Plusargs"
+	if (\$value\$plusargs("${1:ARG_NAME}=%d", ${2:val})) begin
+		${3}
+	end
+
+# ============================================================================
+# FSM TEMPLATE (Standard 3-Process or 2-Process style)
+# ============================================================================
+
+snippet fsm "Finite State Machine Template"
+	// --- FSM State Definitions ---
 	typedef enum logic [${1:1}:0] {
-	    ${2:IDLE}   = ${3:2'b00},
-	    ${4:ACTIVE} = ${5:2'b01},
-	    ${6:DONE}   = ${7:2'b10}
-	} ${8:state}_t;
+		${2:IDLE}   = ${3:2'b00},
+		${4:ACTIVE} = ${5:2'b01},
+		${6:DONE}   = ${7:2'b10}
+	} ${8:state}_e;
 	
-	$8_t current_state, next_state;
+	$8_e current_state, next_state;
 	
+	// --- State Transition (Sequential) ---
 	always_ff @(posedge ${9:clk} or negedge ${10:rst_n}) begin
-	    if (!$10)
-	        current_state <= $2;
-	    else
-	        current_state <= next_state;
+		if (!$10) begin
+			current_state <= $2;
+		end else begin
+			current_state <= next_state;
+		end
 	end
 	
+	// --- Next State Logic (Combinational) ---
 	always_comb begin
-	    next_state = current_state;
-	    case (current_state)
-	        $2:   ${11}
-	        $4:   ${12}
-	        $6:   ${13}
-	        default: next_state = $2;
-	    endcase
+		next_state = current_state; // Default to hold state
+		case (current_state)
+			$2: begin
+				if (${11:start}) next_state = $4;
+			end
+			
+			$4: begin
+				${12:// logic}
+				next_state = $6;
+			end
+			
+			$6: begin
+				next_state = $2;
+			end
+			
+			default: next_state = $2;
+		endcase
 	end
 
-# =============================================================================
-# COMMON PATTERNS
-# =============================================================================
+# ============================================================================
+# COMMON RTL PATTERNS
+# ============================================================================
 
-snippet fifo "FIFO control"
-	logic [${1:DEPTH_W}-1:0] wr_ptr, rd_ptr;
-	logic [${2:DATA_W}-1:0] mem [2**$1];
-	logic empty, full;
+snippet fifo "Synchronous FIFO (Extra Bit Logic)"
+	// FIFO Parameters
+	localparam int FIFO_DEPTH = ${1:16};
+	localparam int DATA_W     = ${2:32};
+	localparam int PTR_W      = \$clog2(FIFO_DEPTH);
 	
+	// Pointers (Extra bit for Full/Empty distinction)
+	logic [PTR_W:0] wr_ptr, rd_ptr;
+	logic [DATA_W-1:0] mem [FIFO_DEPTH];
+	
+	logic full, empty;
+	logic wr_en, rd_en;
+	
+	// Flags
 	assign empty = (wr_ptr == rd_ptr);
-	assign full  = (wr_ptr + 1 == rd_ptr);
-
-snippet handshake "Valid-ready handshake"
-	logic ${1:valid}, ${2:ready};
+	assign full  = (wr_ptr[PTR_W] != rd_ptr[PTR_W]) && 
+	               (wr_ptr[PTR_W-1:0] == rd_ptr[PTR_W-1:0]);
 	
+	// Write Logic
 	always_ff @(posedge ${3:clk} or negedge ${4:rst_n}) begin
-	    if (!$4)
-	        $1 <= 1'b0;
-	    else if ($1 && $2)
-	        $1 <= 1'b0;
-	    else if (${5:condition})
-	        $1 <= 1'b1;
+		if (!$4) begin
+			wr_ptr <= '0;
+		end else if (${5:push} && !full) begin
+			mem[wr_ptr[PTR_W-1:0]] <= ${6:wdata};
+			wr_ptr <= wr_ptr + 1'b1;
+		end
+	end
+	
+	// Read Logic
+	always_ff @(posedge $3 or negedge $4) begin
+		if (!$4) begin
+			rd_ptr <= '0;
+		end else if (${7:pop} && !empty) begin
+			${8:rdata} <= mem[rd_ptr[PTR_W-1:0]];
+			rd_ptr <= rd_ptr + 1'b1;
+		end
 	end
 
-snippet assign "Assign"
-	assign ${1:target} = ${2:expression};
+snippet handshake "Valid-Ready Handshake (Source)"
+	// Source Side Logic
+	always_ff @(posedge ${1:clk} or negedge ${2:rst_n}) begin
+		if (!$2) begin
+			${3:valid} <= 1'b0;
+			${4:data}  <= '0;
+		end else begin
+			// Transaction accepted (Fire), can load new data
+			if ($3 && ${5:ready}) begin
+				if (${6:has_new_data}) begin
+					$3 <= 1'b1;
+					$4 <= ${7:new_data};
+				end else begin
+					$3 <= 1'b0;
+				end
+			end
+			// Idle state, waiting for data
+			else if (!$3 && $6) begin
+				$3 <= 1'b1;
+				$4 <= $7;
+			end
+		end
+	end
 
-# =============================================================================
-# UVM COMPONENTS
-# =============================================================================
+snippet sync_2ff "2-Stage Synchronizer (CDC)"
+	logic [${1:WIDTH-1}:0] ${2:sig}_d1, $2_d2;
+	
+	always_ff @(posedge ${3:clk_dest} or negedge ${4:rst_n}) begin
+		if (!$4) begin
+			$2_d1 <= '0;
+			$2_d2 <= '0;
+		end else begin
+			$2_d1 <= ${5:sig_src};
+			$2_d2 <= $2_d1;
+		end
+	end
+	
+	assign ${6:sig_synced} = $2_d2;
 
-snippet uvm_agent "UVM Agent"
-	class ${1:`expand('%:t:r')`} extends uvm_agent;
-	    `uvm_component_utils($1)
+snippet counter "Simple Counter"
+	logic [${1:WIDTH-1}:0] cnt;
 	
-	    ${2:`substitute(expand('%:t:r'), '_agent$', '', '')`}_sequencer  sqr;
-	    $2_driver     drv;
-	    $2_monitor    mon;
+	always_ff @(posedge ${2:clk} or negedge ${3:rst_n}) begin
+		if (!$3) begin
+			cnt <= '0;
+		end else if (${4:en}) begin
+			if (cnt == ${5:MAX_VAL})
+				cnt <= '0;
+			else
+				cnt <= cnt + 1'b1;
+		end
+	end
+
+snippet assign "Assign Statement"
+	assign ${1:lhs} = ${2:rhs};
+
+snippet assign_mux "Assign Mux (Ternary)"
+	assign ${1:out} = (${2:sel}) ? ${3:val_true} : ${4:val_false};
+
+snippet always_comb "Always Comb"
+	always_comb begin
+		${1:out} = ${2:default_val};
+		if (${3:cond}) begin
+			$1 = ${4:val};
+		end
+	end
+# ============================================================================
+# UVM AGENT
+# ============================================================================
+snippet uvm_agent "UVM Agent (Universal)"
+	class ${1:$TM_FILENAME_BASE} extends uvm_agent;
+		\`uvm_component_utils($1)
 	
-	    uvm_active_passive_enum is_active = UVM_ACTIVE;
+		// Sub-components
+		// Tip: If filename is 'my_agent.sv', sub-components default to 'my_agent_sequencer'
+		${1}_sequencer  sqr;
+		${1}_driver     drv;
+		${1}_monitor    mon;
 	
-	    extern function new(string name = "$1", uvm_component parent = null);
-	    extern virtual function void build_phase(uvm_phase phase);
-	    extern virtual function void connect_phase(uvm_phase phase);
+		uvm_active_passive_enum is_active = UVM_ACTIVE;
+	
+		extern function new(string name = "$1", uvm_component parent = null);
+		extern virtual function void build_phase(uvm_phase phase);
+		extern virtual function void connect_phase(uvm_phase phase);
 	
 	endclass: $1
 	
 	function $1::new(string name = "$1", uvm_component parent = null);
-	    super.new(name, parent);
+		super.new(name, parent);
 	endfunction: new
 	
 	function void $1::build_phase(uvm_phase phase);
-	    super.build_phase(phase);
-	    
-	    // Get configuration
-	    if (!uvm_config_db#(uvm_active_passive_enum)::get(this, "", "is_active", is_active))
-	        `uvm_info(get_name(), "is_active not configured, using default UVM_ACTIVE", UVM_MEDIUM)
-	    
-	    // Always create monitor
-	    mon = $2_monitor::type_id::create("mon", this);
-	    
-	    // Create driver and sequencer only in active mode
-	    if (is_active == UVM_ACTIVE) begin
-	        sqr = $2_sequencer::type_id::create("sqr", this);
-	        drv = $2_driver::type_id::create("drv", this);
-	    end
+		super.build_phase(phase);
+		
+		if (!uvm_config_db#(uvm_active_passive_enum)::get(this, "", "is_active", is_active))
+			\`uvm_info(get_name(), "is_active not configured, using default UVM_ACTIVE", UVM_MEDIUM)
+		
+		mon = ${1}_monitor::type_id::create("mon", this);
+		
+		if (is_active == UVM_ACTIVE) begin
+			sqr = ${1}_sequencer::type_id::create("sqr", this);
+			drv = ${1}_driver::type_id::create("drv", this);
+		end
 	endfunction: build_phase
 	
 	function void $1::connect_phase(uvm_phase phase);
-	    super.connect_phase(phase);
-	    if (is_active == UVM_ACTIVE) begin
-	        drv.seq_item_port.connect(sqr.seq_item_export);
-	    end
+		super.connect_phase(phase);
+		if (is_active == UVM_ACTIVE) begin
+			drv.seq_item_port.connect(sqr.seq_item_export);
+		end
 	endfunction: connect_phase
 
-snippet uvm_driver "UVM Driver"
-	class ${1:`expand('%:t:r')`} extends uvm_driver #(${2:`substitute(expand('%:t:r'), '_driver$', '_item', '')`});
-	    `uvm_component_utils($1)
+# ============================================================================
+# UVM DRIVER
+# ============================================================================
+snippet uvm_driver "UVM Driver (Universal)"
+	class ${1:$TM_FILENAME_BASE} extends uvm_driver #(${2:${1}_item});
+		\`uvm_component_utils($1)
 	
-	    virtual ${3:`substitute(expand('%:t:r'), '_driver$', '_if', '')`} vif;
+		virtual ${3:${1}_if} vif;
 	
-	    extern function new(string name = "$1", uvm_component parent = null);
-	    extern virtual function void build_phase(uvm_phase phase);
-	    extern virtual task run_phase(uvm_phase phase);
-	    extern virtual task drive_item($2 item);
+		extern function new(string name = "$1", uvm_component parent = null);
+		extern virtual function void build_phase(uvm_phase phase);
+		extern virtual task run_phase(uvm_phase phase);
+		extern virtual task drive_item($2 item);
 	
 	endclass: $1
 	
 	function $1::new(string name = "$1", uvm_component parent = null);
-	    super.new(name, parent);
+		super.new(name, parent);
 	endfunction: new
 	
 	function void $1::build_phase(uvm_phase phase);
-	    super.build_phase(phase);
-	    if (!uvm_config_db#(virtual $3)::get(this, "", "vif", vif))
-	        `uvm_fatal(get_name(), "Virtual interface not found!")
+		super.build_phase(phase);
+		if (!uvm_config_db#(virtual $3)::get(this, "", "vif", vif))
+			\`uvm_fatal(get_name(), "Virtual interface not found!")
 	endfunction: build_phase
 	
 	task $1::run_phase(uvm_phase phase);
-	    forever begin
-	        seq_item_port.get_next_item(req);
-	        drive_item(req);
-	        seq_item_port.item_done();
-	    end
+		forever begin
+			seq_item_port.get_next_item(req);
+			drive_item(req);
+			seq_item_port.item_done();
+		end
 	endtask: run_phase
 	
 	task $1::drive_item($2 item);
-	    // TODO: Implement protocol-specific driving
-	    // Example:
-	    // @(posedge vif.clk);
-	    // vif.data <= item.data;
-	    ${0}
+		// TODO: Implement protocol-specific driving
+		// Example:
+		// @(posedge vif.clk);
+		// vif.data <= item.data;
+		${0}
 	endtask: drive_item
 
-snippet uvm_monitor "UVM Monitor"
-	class ${1:`expand('%:t:r')`} extends uvm_monitor;
-	    `uvm_component_utils($1)
+# ============================================================================
+# UVM MONITOR
+# ============================================================================
+snippet uvm_monitor "UVM Monitor (Universal)"
+	class ${1:$TM_FILENAME_BASE} extends uvm_monitor;
+		\`uvm_component_utils($1)
 	
-	    uvm_analysis_port #(${2:`substitute(expand('%:t:r'), '_monitor$', '_item', '')`}) ap;
-	    virtual ${3:`substitute(expand('%:t:r'), '_monitor$', '_if', '')`} vif;
+		uvm_analysis_port #(${2:${1}_item}) ap;
+		virtual ${3:${1}_if} vif;
 	
-	    extern function new(string name = "$1", uvm_component parent = null);
-	    extern virtual function void build_phase(uvm_phase phase);
-	    extern virtual task run_phase(uvm_phase phase);
-	    extern virtual task collect_transaction(output $2 item);
+		extern function new(string name = "$1", uvm_component parent = null);
+		extern virtual function void build_phase(uvm_phase phase);
+		extern virtual task run_phase(uvm_phase phase);
+		extern virtual task collect_transaction(output $2 item);
 	
 	endclass: $1
 	
 	function $1::new(string name = "$1", uvm_component parent = null);
-	    super.new(name, parent);
+		super.new(name, parent);
 	endfunction: new
 	
 	function void $1::build_phase(uvm_phase phase);
-	    super.build_phase(phase);
-	    ap = new("ap", this);
-	    if (!uvm_config_db#(virtual $3)::get(this, "", "vif", vif))
-	        `uvm_fatal(get_name(), "Virtual interface not found!")
+		super.build_phase(phase);
+		ap = new("ap", this);
+		if (!uvm_config_db#(virtual $3)::get(this, "", "vif", vif))
+			\`uvm_fatal(get_name(), "Virtual interface not found!")
 	endfunction: build_phase
 	
 	task $1::run_phase(uvm_phase phase);
-	    forever begin
-	        $2 item;
-	        collect_transaction(item);
-	        `uvm_info(get_name(), item.convert2string(), UVM_HIGH)
-	        ap.write(item);
-	    end
+		forever begin
+			$2 item;
+			collect_transaction(item);
+			\`uvm_info(get_name(), item.convert2string(), UVM_HIGH)
+			ap.write(item);
+		end
 	endtask: run_phase
 	
 	task $1::collect_transaction(output $2 item);
-	    item = $2::type_id::create("item");
-	    // TODO: Implement protocol-specific monitoring
-	    // Example:
-	    // @(posedge vif.clk);
-	    // if (vif.valid && vif.ready) begin
-	    //   item.data = vif.data;
-	    // end
-	    ${0}
+		item = $2::type_id::create("item");
+		// TODO: Monitor Logic
+		// @(posedge vif.clk);
+		// if (vif.valid) item.data = vif.data;
+		${0}
 	endtask: collect_transaction
 
-snippet uvm_sequencer "UVM Sequencer"
-	class ${1:`expand('%:t:r')`} extends uvm_sequencer #(${2:`substitute(expand('%:t:r'), '_sequencer$', '_item', '')`});
-	    `uvm_component_utils($1)
+# ============================================================================
+# UVM SEQUENCER
+# ============================================================================
+snippet uvm_sequencer "UVM Sequencer (Universal)"
+	class ${1:$TM_FILENAME_BASE} extends uvm_sequencer #(${2:${1}_item});
+		\`uvm_component_utils($1)
 	
-	    extern function new(string name = "$1", uvm_component parent = null);
+		extern function new(string name = "$1", uvm_component parent = null);
 	
 	endclass: $1
 	
 	function $1::new(string name = "$1", uvm_component parent = null);
-	    super.new(name, parent);
+		super.new(name, parent);
 	endfunction: new
 
-snippet uvm_sequence "UVM Sequence"
-	class ${1:`expand('%:t:r')`} extends uvm_sequence #(${2:`substitute(expand('%:t:r'), '_\(seq\|sequence\)$', '_item', '')`});
-	    `uvm_object_utils($1)
+# ============================================================================
+# UVM SEQUENCE
+# ============================================================================
+snippet uvm_sequence "UVM Sequence (Universal)"
+	class ${1:$TM_FILENAME_BASE} extends uvm_sequence #(${2:${1}_item});
+		\`uvm_object_utils($1)
 	
-	    // Sequence properties
-	    rand int unsigned num_trans = ${3:10};
+		rand int unsigned num_trans = ${3:10};
 	
-	    extern function new(string name = "$1");
-	    extern virtual task body();
-	    extern virtual task pre_body();
-	    extern virtual task post_body();
+		extern function new(string name = "$1");
+		extern virtual task body();
+		extern virtual task pre_body();
+		extern virtual task post_body();
 	
 	endclass: $1
 	
 	function $1::new(string name = "$1");
-	    super.new(name);
+		super.new(name);
 	endfunction: new
 	
 	task $1::pre_body();
-	    // Setup before sequence execution
-	    `uvm_info(get_type_name(), $sformatf("Starting sequence with %0d transactions", num_trans), UVM_MEDIUM)
+		if (starting_phase != null)
+			starting_phase.raise_objection(this);
 	endtask: pre_body
 	
 	task $1::body();
-	    repeat (num_trans) begin
-	        `uvm_do(req)
-	    end
+		repeat (num_trans) begin
+			\`uvm_do(req)
+		end
 	endtask: body
 	
 	task $1::post_body();
-	    // Cleanup after sequence execution
-	    `uvm_info(get_type_name(), "Sequence completed", UVM_MEDIUM)
+		if (starting_phase != null)
+			starting_phase.drop_objection(this);
 	endtask: post_body
 
-snippet component_param sequence "UVM Sequence (parameterized)"
-	// ============================================================================
-	// UVM SEQUENCE - Parameterized Version
-	// ============================================================================
-	class ${1:`expand('%:t:r')`} #(
-	    parameter int ${2:DATA_WIDTH} = ${3:32}
-	) extends uvm_sequence #(${4:`substitute(expand('%:t:r'), '_\(seq\|sequence\)$', '_item', '')`}#($2));
-	    `uvm_object_param_utils($1#($2))
+# ============================================================================
+# UVM SEQUENCE ITEM
+# ============================================================================
+snippet sequence_item "UVM Sequence Item (Universal)"
+	class ${1:$TM_FILENAME_BASE} extends uvm_sequence_item;
+		\`uvm_object_utils($1)
 	
-	    typedef $4#($2) item_t;
-	    rand int unsigned num_trans = ${5:10};
+		// --- Transaction Fields ---
+		rand bit [${2:7}:0]  ${3:addr};
+		rand bit [${4:31}:0] ${5:data};
+		${6}
 	
-	    extern function new(string name = "$1");
-	    extern virtual task body();
+		// --- Constraints ---
+		constraint ${7:valid}_c {
+			$3 inside {[0:100]};
+			${8}
+		}
 	
-	endclass: $1
-	
-	function $1#($2)::new(string name = "$1");
-	    super.new(name);
-	endfunction: new
-	
-	task $1#($2)::body();
-	    repeat (num_trans) begin
-	        `uvm_do(req)
-	    end
-	endtask: body
-
-snippet sequence_item "UVM Sequence Item (Transaction)"
-	// ============================================================================
-	// UVM SEQUENCE ITEM - Transaction Object (UVM Cookbook 5.2)
-	// ============================================================================
-	// Purpose:
-	//   1. Define transaction fields
-	//   2. Add constraints for randomization
-	//   3. Implement utility methods
-	//
-	// Required Methods:
-	//   - do_copy()    - Deep copy
-	//   - do_compare() - Field comparison
-	//   - do_print()   - Print fields
-	//   - convert2string() - String representation
-	//
-	// Constraints:
-	//   - Use constraints to limit random values
-	//   - Use rand/randc for randomization
-	//
-	// Example:
-	//   class my_item extends uvm_sequence_item;
-	//     rand bit [7:0] addr;
-	//     rand bit [31:0] data;
-	//     
-	//     constraint addr_c { addr inside {[0:127]}; }
-	//     constraint data_c { data < 1000; }
-	//   endclass
-	// ============================================================================
-	class ${1:`expand('%:t:r')`} extends uvm_sequence_item;
-	    `uvm_object_utils($1)
-	
-	    // Transaction fields
-	    rand bit [${2:7}:0] ${3:addr};
-	    rand bit [${4:31}:0] ${5:data};
-	    ${6}
-	
-	    // Constraints
-	    constraint ${7:valid}_c {
-	        ${8}
-	    }
-	
-	    extern function new(string name = "$1");
-	    extern function void do_copy(uvm_object rhs);
-	    extern function bit do_compare(uvm_object rhs, uvm_comparer comparer);
-	    extern function void do_print(uvm_printer printer);
-	    extern function string convert2string();
+		// --- Standard UVM Methods ---
+		extern function new(string name = "$1");
+		extern function void do_copy(uvm_object rhs);
+		extern function bit do_compare(uvm_object rhs, uvm_comparer comparer);
+		extern function void do_print(uvm_printer printer);
+		extern function string convert2string();
 	
 	endclass: $1
 	
 	function $1::new(string name = "$1");
-	    super.new(name);
+		super.new(name);
 	endfunction: new
 	
 	function void $1::do_copy(uvm_object rhs);
-	    $1 rhs_;
-	    if (!$cast(rhs_, rhs))
-	        `uvm_fatal(get_type_name(), "Cast failed in do_copy")
-	    super.do_copy(rhs);
-	    this.$3 = rhs_.$3;
-	    this.$5 = rhs_.$5;
+		$1 rhs_;
+		if (!$cast(rhs_, rhs))
+			\`uvm_fatal(get_type_name(), "Cast failed in do_copy")
+		super.do_copy(rhs);
+		
+		this.$3 = rhs_.$3;
+		this.$5 = rhs_.$5;
 	endfunction: do_copy
 	
 	function bit $1::do_compare(uvm_object rhs, uvm_comparer comparer);
-	    $1 rhs_;
-	    if (!$cast(rhs_, rhs))
-	        return 0;
-	    return (super.do_compare(rhs, comparer) &&
-	            (this.$3 == rhs_.$3) &&
-	            (this.$5 == rhs_.$5));
+		$1 rhs_;
+		if (!$cast(rhs_, rhs))
+			return 0;
+		return (super.do_compare(rhs, comparer) &&
+				(this.$3 == rhs_.$3) &&
+				(this.$5 == rhs_.$5));
 	endfunction: do_compare
 	
 	function void $1::do_print(uvm_printer printer);
-	    super.do_print(printer);
-	    printer.print_field("$3", this.$3, $2+1);
-	    printer.print_field("$5", this.$5, $4+1);
+		super.do_print(printer);
+		// Using $bits to safely detect size
+		printer.print_field_int("$3", this.$3, $bits(this.$3), UVM_HEX);
+		printer.print_field_int("$5", this.$5, $bits(this.$5), UVM_HEX);
 	endfunction: do_print
 	
 	function string $1::convert2string();
-	    return $sformatf("$3=0x%0h, $5=0x%0h", $3, $5);
+		return $sformatf("$3=0x%0h, $5=0x%0h", $3, $5);
 	endfunction: convert2string
-
-# =============================================================================
+# ============================================================================
 # SYSTEMVERILOG ASSERTIONS (SVA) - COMPREHENSIVE
-# =============================================================================
+# ============================================================================
 
-snippet sva_property "SVA Property Definition (Detailed)"
-	// ============================================================================
-	// SVA PROPERTY - Assertion Property (IEEE 1800-2017 Chapter 16)
-	// ============================================================================
-	// Purpose: Define temporal property for verification
-	//
-	// Property Structure:
-	//   property name;
-	//     @(posedge clk) disable iff (reset)
-	//     antecedent |-> consequent;
-	//   endproperty
-	//
-	// Implication Operators:
-	//   |->  Overlapping (consequent checked same cycle)
-	//   |=>  Non-overlapping (consequent checked next cycle)
-	//
-	// Sequence Operators:
-	//   ##n  - Delay by n cycles
-	//   ##[m:n] - Delay between m and n cycles
-	//   [*n] - Repeat exactly n times
-	//   [*m:n] - Repeat between m and n times
-	//   [->n] - Goto repetition (non-consecutive)
-	//   [=n]  - Non-consecutive repetition
-	//
-	// Example:
-	//   property req_ack;
-	//     @(posedge clk) disable iff (rst)
-	//     req |-> ##[1:3] ack;
-	//   endproperty
-	// ============================================================================
+# --- Basic Property Definition ---
+snippet sva_property "SVA Property Definition"
 	property ${1:prop_name};
-	    @(posedge ${2:clk}) disable iff (${3:!rst_n})
-	    ${4:antecedent} |-> ${5:consequent};
+		@(posedge ${2:clk}) disable iff (!${3:rst_n})
+		${4:antecedent} |-> ${5:consequent};
 	endproperty: $1
 	
-	${6:assert_}$1: assert property ($1)
-	    else `uvm_error("ASSERT", $sformatf("$1 failed at %0t", $time))
+	${6:a}_$1: assert property ($1)
+		else \`uvm_error("ASSERT", \$sformatf("$1 failed at %0t", \$time));
 
+# --- Sequence Definition ---
 snippet sva_sequence "SVA Sequence Definition"
-	// ============================================================================
-	// SVA SEQUENCE - Reusable Temporal Pattern
-	// ============================================================================
-	// Purpose: Define reusable sequence of events
-	//
-	// Common Patterns:
-	//   - sig_rise: $rose(signal)
-	//   - sig_fall: $fell(signal)
-	//   - stable:   $stable(signal)
-	//   - delay:    ##n (n cycles delay)
-	//   - throughout: expr throughout seq
-	//
-	// Example:
-	//   sequence handshake;
-	//     valid ##1 ready;
-	//   endsequence
-	// ============================================================================
 	sequence ${1:seq_name};
-	    ${2:expression};
+		${2:expression};
 	endsequence: $1
 
+# --- Implication Examples ---
 snippet sva_implication "SVA Implication Examples"
-	// Overlapping Implication (|->)
-	// Consequent checked in same cycle as antecedent
-	property ${1:overlap_prop};
-	    @(posedge ${2:clk}) disable iff (${3:!rst_n})
-	    ${4:req} |-> ${5:grant};  // If req this cycle, grant must be true this cycle
+	// Overlapping (|->): Consequent checked in SAME cycle
+	property ${1:overlap_p};
+		@(posedge ${2:clk}) disable iff (!${3:rst_n})
+		${4:req} |-> ${5:grant};
 	endproperty
 	
-	// Non-overlapping Implication (|=>)
-	// Consequent checked in next cycle
-	property ${6:nonoverlap_prop};
-	    @(posedge $2) disable iff ($3)
-	    $4 |=> $5;  // If req this cycle, grant must be true next cycle
+	// Non-overlapping (|=>): Consequent checked in NEXT cycle
+	property ${6:nonoverlap_p};
+		@(posedge $2) disable iff (!$3)
+		$4 |=> $5;
 	endproperty
 
+# --- Delay Operators ---
 snippet sva_delay "SVA Delay Operators"
-	// ============================================================================
-	// SVA DELAY OPERATORS
-	// ============================================================================
-	// Fixed Delay: ##n
-	property ${1:fixed_delay};
-	    @(posedge ${2:clk})
-	    ${3:req} |-> ##${4:2} ${5:ack};  // ack exactly 2 cycles after req
+	// Fixed Delay (##n)
+	property ${1:fixed_delay_p};
+		@(posedge ${2:clk}) ${3:req} |-> ##${4:2} ${5:ack};
 	endproperty
 	
-	// Range Delay: ##[m:n]
-	property ${6:range_delay};
-	    @(posedge $2)
-	    $3 |-> ##[${7:1}:${8:5}] $5;  // ack within 1-5 cycles after req
+	// Range Delay (##[min:max])
+	property ${6:range_delay_p};
+		@(posedge $2) $3 |-> ##[${7:1}:${8:5}] $5;
 	endproperty
 	
-	// Unbounded Delay: ##[1:$]
-	property ${9:unbounded_delay};
-	    @(posedge $2)
-	    $3 |-> ##[1:$] $5;  // ack eventually after req
+	// Unbounded Delay (##[1:$])
+	property ${9:unbounded_delay_p};
+		@(posedge $2) $3 |-> ##[1:$] $5;
 	endproperty
 
+# --- Repetition Operators ---
 snippet sva_repetition "SVA Repetition Operators"
-	// ============================================================================
-	// SVA REPETITION OPERATORS
-	// ============================================================================
-	// Consecutive Repetition: [*n]
-	property ${1:consecutive_rep};
-	    @(posedge ${2:clk})
-	    ${3:busy}[*${4:3}] ##1 ${5:done};  // busy for exactly 3 cycles, then done
+	// Consecutive [*n]: Signal holds for n cycles continuously
+	property ${1:consecutive_rep_p};
+		@(posedge ${2:clk}) ${3:busy}[*${4:3}] ##1 ${5:done};
 	endproperty
 	
-	// Range Repetition: [*m:n]
-	property ${6:range_rep};
-	    @(posedge $2)
-	    $3[*${7:2}:${8:5}] ##1 $5;  // busy for 2-5 cycles, then done
+	// Goto [->n]: Signal occurs n times (non-consecutive), implies immediate follow
+	property ${6:goto_rep_p};
+		@(posedge $2) ${7:valid}[->${8:3}] ##1 ${9:complete};
 	endproperty
 	
-	// Goto Repetition: [->n]
-	property ${9:goto_rep};
-	    @(posedge $2)
-	    ${10:valid}[->3] ##1 ${11:complete};  // valid high 3 times (non-consecutive), then complete
-	endproperty
-	
-	// Non-consecutive Repetition: [=n]
-	property ${12:noncons_rep};
-	    @(posedge $2)
-	    $10[=3];  // valid high 3 times (may be non-consecutive)
+	// Non-consecutive [=n]: Signal occurs n times (non-consecutive)
+	property ${10:noncons_rep_p};
+		@(posedge $2) ${11:valid}[=${12:3}];
 	endproperty
 
-snippet sva_throughout "SVA Throughout Operator"
-	// ============================================================================
-	// SVA THROUGHOUT - Condition Must Hold During Sequence
-	// ============================================================================
-	property ${1:throughout_prop};
-	    @(posedge ${2:clk})
-	    ${3:enable} throughout (${4:req} ##[1:5] ${5:ack});
-	    // enable must remain high from req until ack
-	endproperty
-
+# --- Advanced Patterns ---
 snippet sva_advanced "SVA Advanced Patterns"
-	// ============================================================================
-	// ADVANCED SVA PATTERNS
-	// ============================================================================
-	
 	// 1. Request-Acknowledge with Timeout
-	property ${1:req_ack_timeout};
-	    @(posedge ${2:clk}) disable iff (${3:!rst_n})
-	    ${4:req} |-> ##[1:${5:10}] ${6:ack};
+	property ${1:req_ack_timeout_p};
+		@(posedge ${2:clk}) disable iff (!${3:rst_n})
+		${4:req} |-> ##[1:${5:10}] ${6:ack};
 	endproperty
 	
-	// 2. Mutual Exclusion
-	property ${7:mutex};
-	    @(posedge $2) disable iff ($3)
-	    ${8:sig_a} |-> !${9:sig_b};
+	// 2. Mutual Exclusion (Mutex)
+	property ${7:mutex_p};
+		@(posedge $2) disable iff (!$3)
+		${8:sig_a} |-> !${9:sig_b};
 	endproperty
 	
-	// 3. FIFO Full/Empty Relationship
-	property ${10:fifo_full_empty};
-	    @(posedge $2) disable iff ($3)
-	    !(${11:full} && ${12:empty});
+	// 3. FIFO Full/Empty Mutex
+	property ${10:fifo_integrity_p};
+		@(posedge $2) disable iff (!$3)
+		!(${11:full} && ${12:empty});
 	endproperty
 	
-	// 4. Handshake Protocol
-	property ${13:handshake};
-	    @(posedge $2) disable iff ($3)
-	    ${14:valid} && ${15:ready} |=> !${16:valid} || ${17:new_data};
-	endproperty
-	
-	// 5. One-Hot Encoding
-	property ${18:onehot};
-	    @(posedge $2)
-	    $onehot(${19:state});
+	// 4. Handshake (Valid stable until Ready)
+	property ${13:handshake_p};
+		@(posedge $2) disable iff (!$3)
+		${14:valid} && !${15:ready} |=> \$stable($14);
 	endproperty
 
-snippet sva_cover "SVA COVER - Functional Coverage via Assertions"
-	// ============================================================================
-	// SVA COVER - Functional Coverage via Assertions
-	// ============================================================================
-	// Purpose: Verify that certain scenarios occur during simulation
-	//
-	// Usage:
-	//   cover property (prop_name);
-	//
-	// Reports when property matches, useful for:
-	//   - Verifying corner cases occur
-	//   - Checking stimulus coverage
-	//   - Debug: Did this scenario happen?
-	// ============================================================================
-	property ${1:cover_prop};
-	    @(posedge ${2:clk})
-	    ${3:condition};
+# --- Coverage & Constraints ---
+snippet sva_cover "SVA Cover Property"
+	property ${1:cover_p};
+		@(posedge ${2:clk}) ${3:condition};
 	endproperty
 	
-	cover_$1: cover property ($1)
-	    `uvm_info("COVER", $sformatf("$1 covered at %0t", $time), UVM_MEDIUM)
+	c_$1: cover property ($1)
+		statement; // Optional: \`uvm_info("COV", "Hit!", UVM_LOW)
 
-snippet sva_assume "SVA Assume Property"
-	// ============================================================================
-	// SVA ASSUME - Input Constraints for Formal Verification
-	// ============================================================================
-	// Purpose: Constrain input behavior for formal tools
-	//
-	// Usage:
-	//   assume property (input_constraint);
-	//
-	// Difference from assert:
-	//   - assert: Check DUT behavior (outputs)
-	//   - assume: Constrain environment (inputs)
-	// ============================================================================
-	property ${1:assume_prop};
-	    @(posedge ${2:clk})
-	    ${3:input_constraint};
+snippet sva_assume "SVA Assume Property (Formal)"
+	property ${1:assume_p};
+		@(posedge ${2:clk}) ${3:constraint_expr};
 	endproperty
 	
 	assume_$1: assume property ($1);
 
-snippet sva_concurrent "SVA Concurrent Assertion"
-	// ============================================================================
-	// CONCURRENT ASSERTION - Clocked Assertion
-	// ============================================================================
-	// Evaluated continuously at clock edges
-	// Use for protocol checking, temporal properties
-	// ============================================================================
-	${1:assert_name}: assert property (
-	    @(posedge ${2:clk}) disable iff (${3:!rst_n})
-	    ${4:property_expression}
-	) else `uvm_error("ASSERT", "$1 failed");
-
+# --- Immediate Assertions ---
 snippet sva_immediate "SVA Immediate Assertion"
-	// ============================================================================
-	// IMMEDIATE ASSERTION - Procedural Assertion
-	// ============================================================================
-	// Evaluated immediately like procedural code
-	// Use for: function inputs, internal checks, constraints
-	// ============================================================================
-	assert (${1:condition}) else `uvm_error("ASSERT", "${2:Assertion failed}");
+	assert (${1:condition}) else \`uvm_error("ASSERT", "${2:Assertion failed}");
 
+# --- System Functions ---
 snippet sva_system "SVA System Functions"
-	// ============================================================================
-	// SVA SYSTEM FUNCTIONS
-	// ============================================================================
-	
-	// $rose - Detects 0->1 transition
-	property ${1:rose_detect};
-	    @(posedge ${2:clk})
-	    $rose(${3:signal}) |-> ${4:action};
+	// $rose (0->1), $fell (1->0), $stable (no change)
+	property ${1:edge_detect_p};
+		@(posedge ${2:clk}) \$rose(${3:sig}) |-> ##1 \$fell($3);
 	endproperty
 	
-	// $fell - Detects 1->0 transition
-	property ${5:fell_detect};
-	    @(posedge $2)
-	    $fell($3) |-> $4;
+	// $onehot (Exactly 1 bit), $onehot0 (0 or 1 bit)
+	property ${4:onehot_check_p};
+		@(posedge $2) \$onehot(${5:bus});
 	endproperty
 	
-	// $stable - Signal unchanged
-	property ${6:stable_check};
-	    @(posedge $2)
-	    ${7:hold} |-> $stable($3);
-	endproperty
-	
-	// $past - Previous value
-	property ${8:past_check};
-	    @(posedge $2)
-	    ${9:valid} |-> ${10:data} == $past(${11:prev_data});
-	endproperty
-	
-	// $onehot - Exactly one bit high
-	property ${12:onehot_check};
-	    @(posedge $2)
-	    $onehot(${13:state_vector});
-	endproperty
-	
-	// $onehot0 - At most one bit high
-	property ${14:onehot0_check};
-	    @(posedge $2)
-	    $onehot0($13);
-	endproperty
-	
-	// $isunknown - Check for X/Z
-	property ${15:unknown_check};
-	    @(posedge $2)
-	    !$isunknown($3);
+	// $isunknown (Check for X/Z)
+	property ${6:unknown_check_p};
+		@(posedge $2) !\$isunknown(${7:sig});
 	endproperty
 
-snippet sva_fifo "SVA FIFO Protocol Assertions"
-	// ============================================================================
-	// COMPLETE FIFO ASSERTION SUITE
-	// ============================================================================
-	
+# --- FIFO Protocol Assertions ---
+snippet sva_fifo "SVA FIFO Suite"
 	// 1. No write when full
-	property ${1:no_write_when_full};
-	    @(posedge ${2:clk}) disable iff (${3:!rst_n})
-	    ${4:full} |-> !${5:wr_en};
+	assert_no_wr_full: assert property (
+		@(posedge ${1:clk}) disable iff (!${2:rst_n})
+		${3:full} |-> !${4:wr_en}
+	) else \`uvm_error("FIFO", "Write to full FIFO");
+
+	// 2. No read when empty
+	assert_no_rd_empty: assert property (
+		@(posedge $1) disable iff (!$2)
+		${5:empty} |-> !${6:rd_en}
+	) else \`uvm_error("FIFO", "Read from empty FIFO");
+
+	// 3. Write increments count
+	assert_wr_inc: assert property (
+		@(posedge $1) disable iff (!$2)
+		$4 && !$3 |=> ${7:count} == \$past($7) + 1
+	);
+
+# --- AXI Protocol Assertions ---
+snippet sva_axi "SVA AXI Examples"
+	// 1. Valid must remain stable until Ready
+	property ${1:axi_valid_stable_p};
+		@(posedge ${2:clk}) disable iff (!${3:rst_n})
+		${4:valid} && !${5:ready} |=> \$stable($4) && \$stable(${6:data});
 	endproperty
 	assert_$1: assert property ($1);
 	
-	// 2. No read when empty
-	property ${6:no_read_when_empty};
-	    @(posedge $2) disable iff ($3)
-	    ${7:empty} |-> !${8:rd_en};
-	endproperty
-	assert_$6: assert property ($6);
-	
-	// 3. Write increments count (when not full)
-	property ${9:write_inc_count};
-	    @(posedge $2) disable iff ($3)
-	    $5 && !$4 |=> ${10:count} == $past($10) + 1;
-	endproperty
-	assert_$9: assert property ($9);
-	
-	// 4. Read decrements count (when not empty)
-	property ${11:read_dec_count};
-	    @(posedge $2) disable iff ($3)
-	    $8 && !$7 |=> $10 == $past($10) - 1;
-	endproperty
-	assert_$11: assert property ($11);
-	
-	// 5. Full and empty are mutually exclusive
-	property ${12:full_empty_mutex};
-	    @(posedge $2)
-	    !($4 && $7);
-	endproperty
-	assert_$12: assert property ($12);
-
-snippet sva_axi "SVA AXI Protocol Assertions"
-	// ============================================================================
-	// AXI4 PROTOCOL ASSERTION EXAMPLES
-	// ============================================================================
-	
-	// 1. Valid-Ready Handshake (AXI Rule)
-	property ${1:axi_valid_stable};
-	    @(posedge ${2:clk}) disable iff (${3:!rst_n})
-	    ${4:valid} && !${5:ready} |=> $stable($4) && $stable(${6:data});
-	endproperty
-	assert_$1: assert property ($1)
-	    else `uvm_error("AXI", "VALID/data must remain stable until READY");
-	
-	// 2. BVALID follows WLAST and WREADY
-	property ${7:axi_bvalid_after_wlast};
-	    @(posedge $2) disable iff ($3)
-	    ${8:wlast} && ${9:wready} |-> ##[1:${10:16}] ${11:bvalid};
+	// 2. BVALID follows WLAST/WREADY
+	property ${7:axi_write_response_p};
+		@(posedge $2) disable iff (!$3)
+		${8:wlast} && ${9:wready} |-> ##[1:${10:16}] ${11:bvalid};
 	endproperty
 	assert_$7: assert property ($7);
-	
-	// 3. RVALID must not be dependent on RREADY
-	property ${12:axi_rvalid_independent};
-	    @(posedge $2) disable iff ($3)
-	    ${13:rvalid} |-> ${13:rvalid} throughout (##[0:$] ${14:rready});
-	endproperty
-	assert_$12: assert property ($12);
-
-# =============================================================================
+# ============================================================================
 # MACROS AND PREPROCESSOR (IEEE 1800-2012 Section 22)
-# =============================================================================
+# ============================================================================
 
-snippet macro_define "Define macro with parameters"
+snippet macro_define "Define macro with arguments"
 	\`define ${1:MACRO_NAME}(${2:args}) \\
-	    ${3:macro body}
+		${3:body}
 
-snippet macro_stringify "`\" stringify operator"
+snippet macro_stringify "Stringify operator (`"x`")"
+	// Converts argument to string: \`"val\`" -> "val"
 	\`define ${1:TO_STRING}(${2:x}) \`"${2}\`"
 
-snippet macro_concat "`` token pasting operator"
+snippet macro_concat "Token pasting operator (``)"
+	// Joins two tokens: a\`\`b -> ab
 	\`define ${1:CONCAT}(${2:a}, ${3:b}) ${2}\`\`${3}
 
-snippet macro_ifdef_block "ifdef-else-endif block"
+snippet macro_ifdef_block "Ifdef / Else / Endif"
 	\`ifdef ${1:MACRO_NAME}
-	    ${2:code when defined}
+		${2:// code when defined}
 	\`else
-	    ${3:code when not defined}
+		${3:// code when not defined}
 	\`endif
 
-snippet macro_ifndef_block "ifndef-else-endif block"
+snippet macro_ifndef_block "Ifndef / Else / Endif"
 	\`ifndef ${1:MACRO_NAME}
-	    ${2:code when not defined}
+		${2:// code when not defined}
 	\`else
-	    ${3:code when defined}
+		${3:// code when defined}
 	\`endif
 
 snippet macro_undef "Undefine macro"
@@ -1354,704 +1366,763 @@ snippet macro_undef "Undefine macro"
 snippet macro_line "Line directive"
 	\`line ${1:line_number} "${2:filename}" ${3:level}
 
-snippet macro_default "Default nettype directive"
-	\`default_nettype ${1:wire}
+snippet macro_default_nettype "Default Nettype (Safety: none)"
+	// Forces explicit declaration of all signals (Best Practice)
+	\`default_nettype ${1:none}
 
-snippet macro_resetall "Reset all compiler directives"
+snippet macro_resetall "Reset compiler directives"
 	\`resetall
 
-snippet macro_celldefine "Cell define block"
+snippet macro_celldefine "Cell define block (Library)"
 	\`celldefine
-	${1}
+	${1:module ... endmodule}
 	\`endcelldefine
 
 snippet macro_pragma "Pragma directive"
-	\`pragma ${1:pragma_name} ${2:pragma_value}
+	\`pragma ${1:protect} ${2:param}
 
-snippet macro_begin_keywords "Begin keywords directive"
+snippet macro_begin_keywords "Begin Keywords (Legacy Support)"
 	\`begin_keywords "${1:1800-2012}"
 	${2}
 	\`end_keywords
-
-# =============================================================================
+# ============================================================================
 # COMMON UVM MACROS
-# =============================================================================
+# ============================================================================
 
-snippet uvm_info_macro "UVM_INFO macro usage"
-	\`uvm_info("${1:ID}", $sformatf("${2:Message: %s}", ${3:arg}), ${4:UVM_MEDIUM})
+snippet uvm_info_macro "UVM_INFO macro"
+	\`uvm_info("${1:ID}", \$sformatf("${2:Msg: %s}", ${3:arg}), ${4:UVM_MEDIUM})
 
-snippet uvm_warning_macro "UVM_WARNING macro usage"
-	\`uvm_warning("${1:ID}", $sformatf("${2:Message: %s}", ${3:arg}))
+snippet uvm_warning_macro "UVM_WARNING macro"
+	\`uvm_warning("${1:ID}", \$sformatf("${2:Msg: %s}", ${3:arg}))
 
-snippet uvm_error_macro "UVM_ERROR macro usage"
-	\`uvm_error("${1:ID}", $sformatf("${2:Message: %s}", ${3:arg}))
+snippet uvm_error_macro "UVM_ERROR macro"
+	\`uvm_error("${1:ID}", \$sformatf("${2:Msg: %s}", ${3:arg}))
 
-snippet uvm_fatal_macro "UVM_FATAL macro usage"
-	\`uvm_fatal("${1:ID}", $sformatf("${2:Message: %s}", ${3:arg}))
+snippet uvm_fatal_macro "UVM_FATAL macro"
+	\`uvm_fatal("${1:ID}", \$sformatf("${2:Msg: %s}", ${3:arg}))
+
+# --- Sequence Macros ---
 
 snippet uvm_do_macro "UVM_DO macro"
-	\`uvm_do(${1:sequence_item})
+	\`uvm_do(${1:item})
 
 snippet uvm_do_with_macro "UVM_DO_WITH macro"
-	\`uvm_do_with(${1:sequence_item}, {
-	    ${2:constraints}
+	\`uvm_do_with(${1:item}, {
+		${2:constraint};
 	})
 
 snippet uvm_create_macro "UVM_CREATE macro"
-	\`uvm_create(${1:sequence_item})
+	\`uvm_create(${1:item})
 
 snippet uvm_send_macro "UVM_SEND macro"
-	\`uvm_send(${1:sequence_item})
+	\`uvm_send(${1:item})
 
 snippet uvm_rand_send_macro "UVM_RAND_SEND macro"
-	\`uvm_rand_send(${1:sequence_item})
+	\`uvm_rand_send(${1:item})
 
 snippet uvm_rand_send_with_macro "UVM_RAND_SEND_WITH macro"
-	\`uvm_rand_send_with(${1:sequence_item}, {
-	    ${2:constraints}
+	\`uvm_rand_send_with(${1:item}, {
+		${2:constraint};
 	})
 
-snippet uvm_field_int "UVM_FIELD_INT macro"
-	\`uvm_field_int(${1:field_name}, ${2:UVM_DEFAULT})
+# --- Field Automation Macros ---
 
-snippet uvm_field_object "UVM_FIELD_OBJECT macro"
-	\`uvm_field_object(${1:field_name}, ${2:UVM_DEFAULT})
+snippet uvm_field_int "UVM_FIELD_INT"
+	\`uvm_field_int(${1:field_name}, ${2:UVM_ALL_ON})
 
-snippet uvm_field_string "UVM_FIELD_STRING macro"
-	\`uvm_field_string(${1:field_name}, ${2:UVM_DEFAULT})
+snippet uvm_field_object "UVM_FIELD_OBJECT"
+	\`uvm_field_object(${1:handle_name}, ${2:UVM_ALL_ON})
 
-snippet uvm_field_enum "UVM_FIELD_ENUM macro"
-	\`uvm_field_enum(${1:enum_type}, ${2:field_name}, ${3:UVM_DEFAULT})
+snippet uvm_field_string "UVM_FIELD_STRING"
+	\`uvm_field_string(${1:str_name}, ${2:UVM_ALL_ON})
 
-snippet uvm_field_array_int "UVM_FIELD_ARRAY_INT macro"
-	\`uvm_field_array_int(${1:field_name}, ${2:UVM_DEFAULT})
+snippet uvm_field_enum "UVM_FIELD_ENUM"
+	\`uvm_field_enum(${1:enum_type}, ${2:enum_val}, ${3:UVM_ALL_ON})
 
-snippet uvm_field_sarray_int "UVM_FIELD_SARRAY_INT macro"
-	\`uvm_field_sarray_int(${1:field_name}, ${2:UVM_DEFAULT})
+snippet uvm_field_array_int "UVM_FIELD_ARRAY_INT"
+	\`uvm_field_array_int(${1:array_name}, ${2:UVM_ALL_ON})
 
-snippet uvm_field_queue "UVM_FIELD_QUEUE macro"
-	\`uvm_field_queue_${1:int}(${2:field_name}, ${3:UVM_DEFAULT})
+snippet uvm_field_sarray_int "UVM_FIELD_SARRAY_INT (Static Array)"
+	\`uvm_field_sarray_int(${1:array_name}, ${2:UVM_ALL_ON})
 
-snippet uvm_field_aa "UVM_FIELD_AA macro"
-	\`uvm_field_aa_${1:int}_${2:string}(${3:field_name}, ${4:UVM_DEFAULT})
+snippet uvm_field_queue "UVM_FIELD_QUEUE"
+	\`uvm_field_queue_${1:int}(${2:queue_name}, ${3:UVM_ALL_ON})
 
-# =============================================================================
-# COMMON UTILITY MACROS
-# =============================================================================
+snippet uvm_field_aa "UVM_FIELD_AA (Assoc Array)"
+	\`uvm_field_aa_${1:int}_${2:string}(${3:aa_name}, ${4:UVM_ALL_ON})
 
-snippet macro_min "MIN macro"
+# ============================================================================
+# COMMON UTILITY MACROS (Safe Implementation)
+# ============================================================================
+
+snippet macro_min "MIN(a, b)"
 	\`define MIN(a, b) (((a) < (b)) ? (a) : (b))
 
-snippet macro_max "MAX macro"
+snippet macro_max "MAX(a, b)"
 	\`define MAX(a, b) (((a) > (b)) ? (a) : (b))
 
-snippet macro_abs "ABS macro"
+snippet macro_abs "ABS(x)"
 	\`define ABS(x) (((x) < 0) ? -(x) : (x))
 
-snippet macro_clamp "CLAMP macro"
+snippet macro_clamp "CLAMP(x, min, max)"
 	\`define CLAMP(x, min, max) (((x) < (min)) ? (min) : (((x) > (max)) ? (max) : (x)))
 
-snippet macro_swap "SWAP macro"
+snippet macro_swap "SWAP(a, b, tmp)"
 	\`define SWAP(a, b, tmp) \\
-	    tmp = a; \\
-	    a = b; \\
-	    b = tmp;
+		tmp = a; \\
+		a = b; \\
+		b = tmp;
 
-snippet macro_bit_width "BIT_WIDTH calculation macro"
-	\`define BIT_WIDTH(x) ($clog2(x))
+snippet macro_bit_width "BIT_WIDTH(x) - using $clog2"
+	\`define BIT_WIDTH(x) (\$clog2(x))
 
-snippet macro_is_power_of_2 "IS_POWER_OF_2 check macro"
+snippet macro_is_power_of_2 "IS_POWER_OF_2(x)"
 	\`define IS_POWER_OF_2(x) (((x) != 0) && (((x) & ((x) - 1)) == 0))
 
-snippet macro_align_up "ALIGN_UP macro"
+snippet macro_align_up "ALIGN_UP(x, align)"
 	\`define ALIGN_UP(x, align) ((((x) + (align) - 1) / (align)) * (align))
 
-snippet macro_div_round_up "DIV_ROUND_UP macro"
+snippet macro_div_round_up "DIV_ROUND_UP(x, y)"
 	\`define DIV_ROUND_UP(x, y) (((x) + (y) - 1) / (y))
+# ============================================================================
+# VERIFICATION MACROS (Safety Checks)
+# ============================================================================
 
-# =============================================================================
-# VERIFICATION MACROS
-# =============================================================================
-
-snippet macro_check_fatal "CHECK_FATAL macro"
+snippet macro_check_fatal "CHECK_FATAL(cond, msg)"
 	\`define CHECK_FATAL(cond, msg) \\
-	    if (!(cond)) begin \\
-	        \$fatal(1, msg); \\
-	    end
+		if (!(cond)) begin \\
+			\$fatal(1, msg); \\
+		end
 
-snippet macro_check_error "CHECK_ERROR macro"
+snippet macro_check_error "CHECK_ERROR(cond, msg)"
 	\`define CHECK_ERROR(cond, msg) \\
-	    if (!(cond)) begin \\
-	        \$error(msg); \\
-	    end
+		if (!(cond)) begin \\
+			\$error(msg); \\
+		end
 
-snippet macro_check_warning "CHECK_WARNING macro"
+snippet macro_check_warning "CHECK_WARNING(cond, msg)"
 	\`define CHECK_WARNING(cond, msg) \\
-	    if (!(cond)) begin \\
-	        \$warning(msg); \\
-	    end
+		if (!(cond)) begin \\
+			\$warning(msg); \\
+		end
 
-snippet macro_assert "ASSERT macro"
+snippet macro_assert_simple "ASSERT(cond)"
+	// Simple immediate assertion with auto-stringified error
 	\`define ASSERT(cond) \\
-	    assert(cond) else \$error("Assertion failed: \`"cond\`" at %m")
+		assert(cond) else \$error("ASSERT FAILED: \`"cond\`" at %m")
 
-snippet macro_cover "COVER macro"
-	\`define COVER(name, cond) \\
-	    cover property (@(posedge clk) cond) \\
-	        \$display("Coverage: name hit at %t", \$time);
+snippet macro_cover_simple "COVER(clk, cond)"
+	// Simple functional coverage point
+	\`define COVER(clk_edge, cond) \\
+		cover property (@(clk_edge) cond)
 
-# =============================================================================
-# DEBUG MACROS
-# =============================================================================
+# ============================================================================
+# DEBUG MACROS (Print helpers)
+# ============================================================================
 
-snippet macro_debug "DEBUG print macro"
+snippet macro_debug "DEBUG_PRINT(msg)"
 	\`ifdef DEBUG
-	    \`define DEBUG_PRINT(msg) \$display("[DEBUG] %t: msg", \$time)
+		// Note: Use %s to print the message argument
+		\`define DEBUG_PRINT(msg) \$display("[DEBUG] %0t: %s", \$time, msg)
 	\`else
-	    \`define DEBUG_PRINT(msg)
+		\`define DEBUG_PRINT(msg)
 	\`endif
 
-snippet macro_verbose "VERBOSE print macro"
+snippet macro_verbose "VERBOSE_PRINT(lvl, msg)"
 	\`ifdef VERBOSE
-	    \`define VERBOSE_PRINT(level, msg) \\
-	        if (verbose_level >= level) \$display("[VERBOSE] msg")
+		\`define VERBOSE_PRINT(lvl, msg) \\
+			if (verbose_level >= lvl) \$display("[VERBOSE] %s", msg)
 	\`else
-	    \`define VERBOSE_PRINT(level, msg)
+		\`define VERBOSE_PRINT(lvl, msg)
 	\`endif
 
-snippet macro_trace "TRACE macro"
-	\`define TRACE(msg) \$display("[TRACE] %t %m: msg", \$time)
+snippet macro_trace "TRACE(msg)"
+	// Prints time, module path (%m) and message
+	\`define TRACE(msg) \$display("[TRACE] %0t %m: %s", \$time, msg)
 
-snippet macro_dump_vars "DUMP_VARS macro"
+snippet macro_dump_vars "DUMP_VARS(var)"
+	// Prints variable name (stringified) and its value
 	\`define DUMP_VARS(var) \\
-	    \$display("[DUMP] %t %m: \`"var\`" = %0d", \$time, var)
+		\$display("[DUMP] %0t %m: \`"var\`" = 0x%0h", \$time, var)
+# ============================================================================
+# REGISTER ACCESS MACROS (Backdoor / TB Helper)
+# Warning: Requires 'clk', 'reg_addr', 'reg_wdata', 'reg_wr_en' in scope!
+# ============================================================================
 
-# =============================================================================
-# REGISTER ACCESS MACROS
-# =============================================================================
+snippet macro_reg_write "REG_WRITE(addr, data)"
+	\`define REG_WRITE(a, d) \\
+		@(posedge clk); \\
+		reg_addr  = a; \\
+		reg_wdata = d; \\
+		reg_wr_en = 1'b1; \\
+		@(posedge clk); \\
+		reg_wr_en = 1'b0;
 
-snippet macro_reg_write "REG_WRITE macro"
-	\`define REG_WRITE(addr, data) \\
-	    @(posedge clk); \\
-	    reg_addr = addr; \\
-	    reg_wdata = data; \\
-	    reg_wr_en = 1'b1; \\
-	    @(posedge clk); \\
-	    reg_wr_en = 1'b0;
+snippet macro_reg_read "REG_READ(addr, data_container)"
+	\`define REG_READ(a, d) \\
+		@(posedge clk); \\
+		reg_addr  = a; \\
+		reg_rd_en = 1'b1; \\
+		@(posedge clk); \\
+		d = reg_rdata; \\
+		reg_rd_en = 1'b0;
 
-snippet macro_reg_read "REG_READ macro"
-	\`define REG_READ(addr, data) \\
-	    @(posedge clk); \\
-	    reg_addr = addr; \\
-	    reg_rd_en = 1'b1; \\
-	    @(posedge clk); \\
-	    data = reg_rdata; \\
-	    reg_rd_en = 1'b0;
+snippet macro_reg_field "REG_FIELD(reg, msb, lsb)"
+	\`define REG_FIELD(r, msb, lsb) r[msb:lsb]
 
-snippet macro_reg_field "REG_FIELD extract macro"
-	\`define REG_FIELD(reg, msb, lsb) reg[msb:lsb]
+snippet macro_reg_bit "REG_BIT(reg, bit)"
+	\`define REG_BIT(r, b) r[b]
 
-snippet macro_reg_bit "REG_BIT check macro"
-	\`define REG_BIT(reg, bit) reg[bit]
-
-# =============================================================================
+# ============================================================================
 # TIMING MACROS
-# =============================================================================
+# ============================================================================
 
-snippet macro_wait_clks "WAIT_CLKS macro"
+snippet macro_wait_clks "WAIT_CLKS(n)"
 	\`define WAIT_CLKS(n) \\
-	    repeat(n) @(posedge clk);
+		repeat(n) @(posedge clk);
 
-snippet macro_wait_ns "WAIT_NS macro"
-	\`define WAIT_NS(ns) \\
-	    #(ns * 1ns);
+snippet macro_wait_ns "WAIT_NS(ns)"
+	\`define WAIT_NS(n) \\
+		#(n * 1ns);
 
-snippet macro_wait_until "WAIT_UNTIL macro"
+snippet macro_wait_until "WAIT_UNTIL(cond)"
 	\`define WAIT_UNTIL(cond) \\
-	    wait(cond);
+		wait(cond);
 
-snippet macro_wait_clk_edge "WAIT_CLK_EDGE macro"
+snippet macro_wait_clk_edge "WAIT_CLK_EDGE"
 	\`define WAIT_CLK_EDGE \\
-	    @(posedge clk);
+		@(posedge clk);
 
-# =============================================================================
-# ARRAY/MEMORY MACROS
-# =============================================================================
+# ============================================================================
+# ARRAY/MEMORY UTILITIES (Using Native SV Methods)
+# Note: Macros are bad for these; used inline SV methods instead.
+# ============================================================================
 
-snippet macro_array_sum "ARRAY_SUM macro"
-	\`define ARRAY_SUM(arr, size) \\
-	    function int; \\
-	        int sum = 0; \\
-	        for (int i = 0; i < size; i++) \\
-	            sum += arr[i]; \\
-	        return sum; \\
-	    endfunction
+snippet array_sum "Array Sum (Native .sum)"
+	// Use 'with' for bit-width expansion safety
+	${1:sum_var} = ${2:array}.sum() with (int'(item));
 
-snippet macro_array_fill "ARRAY_FILL macro"
-	\`define ARRAY_FILL(arr, size, val) \\
-	    for (int i = 0; i < size; i++) \\
-	        arr[i] = val;
+snippet array_fill "Array Fill (Native)"
+	${1:array} = '{default: ${2:value}};
 
-snippet macro_array_copy "ARRAY_COPY macro"
-	\`define ARRAY_COPY(dst, src, size) \\
-	    for (int i = 0; i < size; i++) \\
-	        dst[i] = src[i];
+snippet macro_array_copy_loop "ARRAY_COPY (Foreach Loop)"
+	\`define ARRAY_COPY(dst, src) \\
+		foreach (src[i]) dst[i] = src[i];
 
-# =============================================================================
-# CONDITIONAL COMPILATION MACROS
-# =============================================================================
+snippet macro_queue_push "QUEUE_PUSH (Back)"
+	\`define Q_PUSH(q, val) q.push_back(val);
 
-snippet macro_synthesis "SYNTHESIS conditional"
+snippet macro_queue_pop "QUEUE_POP (Front)"
+	\`define Q_POP(q, val) val = q.pop_front();
+
+# ============================================================================
+# CONDITIONAL COMPILATION
+# ============================================================================
+
+snippet macro_synthesis "SYNTHESIS Block"
 	\`ifdef SYNTHESIS
-	    ${1:// Synthesis code}
+		${1:// RTL Code for synthesis}
 	\`else
-	    ${2:// Simulation code}
+		${2:// Behavioral code for simulation}
 	\`endif
 
-snippet macro_formal "FORMAL verification conditional"
+snippet macro_formal "FORMAL Verification Block"
 	\`ifdef FORMAL
-	    ${1:// Formal verification code}
+		${1:// Assertions/Assumptions for Formal Tools}
 	\`endif
 
-snippet macro_coverage "COVERAGE conditional"
+snippet macro_coverage "COVERAGE Block"
 	\`ifdef COVERAGE
-	    ${1:// Coverage code}
+		${1:// Covergroups / Coverpoints}
 	\`endif
 
-snippet macro_simulation "SIMULATION conditional"
+snippet macro_simulation "SIMULATION Only Block"
 	\`ifndef SYNTHESIS
-	    ${1:// Simulation-only code}
+		${1:// Testbench / Debug code}
 	\`endif
+# ============================================================================
+# CODE GENERATION MACROS (Advanced)
+# Uses Token Pasting (``) to auto-generate signal names
+# ============================================================================
 
-# =============================================================================
-# PARAMETERIZED MACROS (Advanced)
-# =============================================================================
-
-snippet macro_gen_comparator "Generate comparator macro"
-	\`define GEN_COMPARATOR(name, width) \\
-	module name ( \\
-	    input  logic [width-1:0] a, \\
-	    input  logic [width-1:0] b, \\
-	    output logic             eq, \\
-	    output logic             gt, \\
-	    output logic             lt  \\
+snippet macro_gen_comparator "GEN_COMPARATOR(name, width)"
+	// Generates a complete comparator module
+	\`define GEN_COMPARATOR(mod_name, width) \\
+	module mod_name ( \\
+		input  logic [width-1:0] a, \\
+		input  logic [width-1:0] b, \\
+		output logic             eq, \\
+		output logic             gt, \\
+		output logic             lt  \\
 	); \\
-	    assign eq = (a == b); \\
-	    assign gt = (a > b); \\
-	    assign lt = (a < b); \\
+		assign eq = (a == b); \\
+		assign gt = (a >  b); \\
+		assign lt = (a <  b); \\
 	endmodule
 
-snippet macro_gen_register "Generate register macro"
-	\`define GEN_REGISTER(name, width, reset_val) \\
+snippet macro_gen_register "GEN_REGISTER(name, width, rst_val)"
+	// Requires scope signals: name_en, name_next, clk, rst_n
+	\`define GEN_REGISTER(name, width, rval) \\
 	always_ff @(posedge clk or negedge rst_n) begin \\
-	    if (!rst_n) \\
-	        name <= reset_val; \\
-	    else if (name``_en) \\
-	        name <= name``_next; \\
+		if (!rst_n) \\
+			name <= rval; \\
+		else if (name\`\`_en) \\
+			name <= name\`\`_next; \\
 	end
 
-snippet macro_gen_fifo "Generate FIFO macro"
-	\`define GEN_FIFO(name, width, depth) \\
-	logic [width-1:0] name``_mem [depth]; \\
-	logic [\$clog2(depth)-1:0] name``_wr_ptr, name``_rd_ptr; \\
-	logic name``_full, name``_empty;
+snippet macro_gen_fifo_sigs "GEN_FIFO_SIGS(name, width, depth)"
+	// Declares signals for a FIFO
+	\`define GEN_FIFO_SIGS(name, width, depth) \\
+	logic [width-1:0] name\`\`_mem [depth]; \\
+	logic [\$clog2(depth)-1:0] name\`\`_wr_ptr, name\`\`_rd_ptr; \\
+	logic name\`\`_full, name\`\`_empty;
 
-# =============================================================================
-# PROTOCOL-SPECIFIC MACROS
-# =============================================================================
+# ============================================================================
+# PROTOCOL-SPECIFIC MACROS (TB Helpers)
+# ============================================================================
 
-snippet macro_axi_handshake "AXI handshake macro"
+# --- AXI4 Helper Macros ---
+
+snippet macro_axi_handshake "AXI_HANDSHAKE(valid, ready)"
 	\`define AXI_HANDSHAKE(valid, ready) \\
-	    (valid && ready)
+		((valid) && (ready))
 
-snippet macro_axi_wait "AXI wait for handshake macro"
+snippet macro_axi_wait "AXI_WAIT_HANDSHAKE(valid, ready)"
 	\`define AXI_WAIT_HANDSHAKE(valid, ready) \\
-	    do begin \\
-	        @(posedge clk); \\
-	    end while (!(valid && ready));
+		do begin \\
+			@(posedge clk); \\
+		end while (!((valid) && (ready)));
 
-snippet macro_apb_write "APB write macro"
+# --- APB3/APB4 Master Macros (With PREADY support) ---
+
+snippet macro_apb_write "APB_WRITE(addr, data)"
 	\`define APB_WRITE(addr, data) \\
-	    @(posedge clk); \\
-	    paddr = addr; \\
-	    pwdata = data; \\
-	    pwrite = 1'b1; \\
-	    psel = 1'b1; \\
-	    @(posedge clk); \\
-	    penable = 1'b1; \\
-	    @(posedge clk); \\
-	    psel = 1'b0; \\
-	    penable = 1'b0;
+		@(posedge clk); \\
+		paddr   = addr; \\
+		pwdata  = data; \\
+		pwrite  = 1'b1; \\
+		psel    = 1'b1; \\
+		penable = 1'b0; \\
+		@(posedge clk); \\
+		penable = 1'b1; \\
+		// Wait for slave ready \\
+		while (!pready) @(posedge clk); \\
+		pwrite  = 1'b0; \\
+		psel    = 1'b0; \\
+		penable = 1'b0;
 
-snippet macro_apb_read "APB read macro"
+snippet macro_apb_read "APB_READ(addr, data_container)"
 	\`define APB_READ(addr, data) \\
-	    @(posedge clk); \\
-	    paddr = addr; \\
-	    pwrite = 1'b0; \\
-	    psel = 1'b1; \\
-	    @(posedge clk); \\
-	    penable = 1'b1; \\
-	    @(posedge clk); \\
-	    data = prdata; \\
-	    psel = 1'b0; \\
-	    penable = 1'b0;
+		@(posedge clk); \\
+		paddr   = addr; \\
+		pwrite  = 1'b0; \\
+		psel    = 1'b1; \\
+		penable = 1'b0; \\
+		@(posedge clk); \\
+		penable = 1'b1; \\
+		// Wait for slave ready \\
+		while (!pready) @(posedge clk); \\
+		data    = prdata; \\
+		psel    = 1'b0; \\
+		penable = 1'b0;
+# ============================================================================
+# STRING MANIPULATION
+# ============================================================================
 
-# =============================================================================
-# STRING MANIPULATION MACROS
-# =============================================================================
-
-snippet macro_str_concat "String concatenation macro"
+snippet macro_str_concat "STR_CONCAT(a, b)"
 	\`define STR_CONCAT(a, b) {a, b}
 
-snippet macro_str_format "String format macro"
+snippet macro_str_format "STR_FORMAT(fmt, args)"
 	\`define STR_FORMAT(fmt, args) \\
-	    \$sformatf(fmt, args)
+		\$sformatf(fmt, args)
 
-snippet macro_to_hex "To hex string macro"
-	\`define TO_HEX(val, width) \\
-	    \$sformatf("0x%0h", val)
+snippet macro_to_hex "TO_HEX(val)"
+	\`define TO_HEX(val) \\
+		\$sformatf("0x%0h", val)
 
-snippet macro_to_bin "To binary string macro"
-	\`define TO_BIN(val, width) \\
-	    \$sformatf("%0b", val)
+snippet macro_to_bin "TO_BIN(val)"
+	\`define TO_BIN(val) \\
+		\$sformatf("%0b", val)
 
-# =============================================================================
-# FILE I/O MACROS
-# =============================================================================
+# ============================================================================
+# FILE I/O OPERATIONS (Safe Wrappers)
+# ============================================================================
 
-snippet macro_file_open "File open macro"
-	\`define FILE_OPEN(handle, filename, mode) \\
-	    handle = \$fopen(filename, mode); \\
-	    if (!handle) \\
-	        \$fatal(1, "Failed to open file: filename");
+snippet macro_file_open "FILE_OPEN(handle, filename, mode)"
+	\`define FILE_OPEN(handle, fname, mode) \\
+		handle = \$fopen(fname, mode); \\
+		if (!handle) begin \\
+			\$fatal(1, \$sformatf("Failed to open file: %s", fname)); \\
+		end
 
-snippet macro_file_write "File write macro"
+snippet macro_file_write "FILE_WRITE(handle, fmt, args)"
 	\`define FILE_WRITE(handle, fmt, args) \\
-	    \$fdisplay(handle, fmt, args);
+		\$fdisplay(handle, fmt, args);
 
-snippet macro_file_close "File close macro"
+snippet macro_file_close "FILE_CLOSE(handle)"
 	\`define FILE_CLOSE(handle) \\
-	    \$fclose(handle);
+		\$fclose(handle);
 
-# =============================================================================
-# RANDOM MACROS
-# =============================================================================
+# ============================================================================
+# RANDOMIZATION HELPERS
+# ============================================================================
 
-snippet macro_rand_range "Random range macro"
+snippet macro_rand_range "RAND_RANGE(min, max)"
 	\`define RAND_RANGE(min, max) \\
-	    (\$urandom_range(max, min))
+		(\$urandom_range((max), (min)))
 
-snippet macro_rand_bool "Random boolean macro"
+snippet macro_rand_bool "RAND_BOOL"
 	\`define RAND_BOOL \\
-	    (\$urandom() & 1)
+		((\$urandom() & 1'b1))
 
-snippet macro_rand_choice "Random choice macro"
+snippet macro_rand_choice "RAND_CHOICE(array, size)"
+	// Returns a random element from an array
 	\`define RAND_CHOICE(arr, size) \\
-	    arr[\$urandom_range(size-1, 0)]
+		arr[\$urandom_range((size)-1, 0)]
 
-# =============================================================================
-# PERFORMANCE MEASUREMENT MACROS
-# =============================================================================
+# ============================================================================
+# PERFORMANCE & PROFILING
+# Note: Variables defined here require macros to be used in proper scope
+# ============================================================================
 
-snippet macro_perf_start "Performance measurement start"
+snippet macro_perf_start "PERF_START(name)"
 	\`define PERF_START(name) \\
-	    realtime name``_start_time = \$realtime;
+		realtime name\`\`_start_time = \$realtime;
 
-snippet macro_perf_end "Performance measurement end"
+snippet macro_perf_end "PERF_END(name)"
 	\`define PERF_END(name) \\
-	    \$display("[PERF] name: %.2f ns", \$realtime - name``_start_time);
+		\$display("[PERF] %s: %.2f ns", \`"name\`", (\$realtime - name\`\`_start_time));
 
-snippet macro_cycle_count "Cycle counter macro"
+snippet macro_cycle_count_start "CYCLE_COUNT_START(name)"
 	\`define CYCLE_COUNT_START(name) \\
-	    int name``_cycle_count = 0;
+		int name\`\`_cycle_cnt = 0;
 
-snippet macro_cycle_count_inc "Cycle counter increment"
+snippet macro_cycle_count_inc "CYCLE_COUNT_INC(name)"
 	\`define CYCLE_COUNT_INC(name) \\
-	    name``_cycle_count++;
+		name\`\`_cycle_cnt++;
 
-snippet macro_cycle_count_report "Cycle counter report"
+snippet macro_cycle_count_report "CYCLE_COUNT_REPORT(name)"
 	\`define CYCLE_COUNT_REPORT(name) \\
-	    \$display("[CYCLES] name: %0d cycles", name``_cycle_count);
-
-# =============================================================================
+		\$display("[CYCLES] %s: %0d cycles", \`"name\`", name\`\`_cycle_cnt);
+# ============================================================================
 # ADDITIONAL SYSTEMVERILOG CONSTRUCTS (IEEE 1800-2012)
-# =============================================================================
+# ============================================================================
 
-snippet checker "Checker module"
+snippet checker "Checker module (Assertion Container)"
+	// Checkers can be instantiated inside modules, interfaces, or procedural blocks
 	checker ${1:checker_name} (
-	    ${2:input logic clk},
-	    ${3:input logic rst_n}
+		input logic ${2:clk},
+		input logic ${3:rst_n},
+		input logic ${4:test_expr}
 	);
-	    ${4:// Assertions}
-	    ${0}
+		default clocking @(posedge $2); endclocking
+		default disable iff (!$3);
+		
+		${5:assert_prop}: assert property (${4});
+		${0}
 	endchecker: $1
 
-snippet let "Let declaration"
-	let ${1:name} = ${2:expression};
+snippet let "Let declaration (Safe Macro)"
+	// 'let' is like `define but with scope and type safety
+	let ${1:name}(${2:args}) = ${3:expression};
 
-snippet expect "Expect statement"
-	expect (${1:property_name}) else ${2:action};
+snippet expect "Expect statement (Blocking Assert)"
+	// Blocks execution until property succeeds
+	expect (${1:property_expr}) else begin
+		\`uvm_error("EXPECT", "Property failed to occur")
+	end
 
-snippet restrict "Restrict property"
-	restrict property (${1:property_name});
+snippet restrict "Restrict property (Formal)"
+	// Constraint for Formal Verification tools
+	restrict property (@(posedge ${1:clk}) ${2:constraint_expr});
 
-snippet alias "Alias statement"
-	alias ${1:new_name} = ${2:existing_name};
+snippet alias "Alias statement (Bidirectional short)"
+	alias ${1:net_a} = ${2:net_b};
 
 snippet nettype "User-defined nettype"
-	nettype ${1:data_type} ${2:nettype_name} with ${3:resolution_function};
+	nettype ${1:real} ${2:real_net} with ${3:sum_function};
 
-# =============================================================================
+# ============================================================================
 # INTERFACE AND MODPORT ADVANCED
-# =============================================================================
+# ============================================================================
 
-snippet interface_class "Interface class"
-	interface class ${1:interface_name};
-	    pure virtual function ${2:void} ${3:method}(${4});
+snippet interface_class "Interface class (OOP Interface)"
+	// Similar to Java Interface - defines pure virtual methods
+	interface class ${1:$TM_FILENAME_BASE};
+		pure virtual function ${2:void} ${3:method_name}(${4:args});
 	endclass: $1
 
 snippet implements "Implements interface class"
 	implements ${1:interface_class_name}
 
-snippet modport_clocking "Modport with clocking"
-	modport ${1:name} (
-	    clocking ${2:cb},
-	    ${3:input reset}
+snippet modport_clocking "Modport with Clocking Block"
+	modport ${1:master} (
+		clocking ${2:cb},
+		output ${3:reset_n}
 	);
 
-snippet interface_param "Parameterized interface"
-	interface ${1:`expand('%:t:r')`} #(
-	    parameter int ${2:WIDTH} = ${3:8}
+snippet interface_param "Parameterized Interface (Universal)"
+	interface ${1:$TM_FILENAME_BASE} #(
+		parameter int ${2:WIDTH} = ${3:32}
 	) (
-	    input logic clk,
-	    input logic rst_n
+		input logic clk,
+		input logic rst_n
 	);
-	    ${4}
+		
+		logic [$2-1:0] ${4:data};
+		logic          ${5:valid};
+		logic          ${6:ready};
+		
+		// Clocking block for Testbench
+		clocking cb @(posedge clk);
+			default input #1step output #1ns;
+			input  $4, $5, $6;
+		endclocking
+		
+		modport tb (clocking cb, input rst_n);
+		modport rtl (input clk, rst_n, $4, $5, output $6);
+		
 	endinterface: $1
-
-# =============================================================================
+# ============================================================================
 # ADVANCED CLASS FEATURES
-# =============================================================================
+# ============================================================================
 
-snippet extern_class "Extern class method"
-	extern class ${1:class_name};
+snippet extern_method "Extern method definition (Out-of-body)"
+	function ${1:void} ${2:class_name}::${3:method_name}(${4:args});
+		${0}
+	endfunction: $3
 
-snippet constraint_mode "Constraint mode control"
-	${1:constraint_name}.constraint_mode(${2:0});
+snippet constraint_mode "Constraint mode (0/1)"
+	${1:obj}.constraint_mode(${2:0});
 
-snippet rand_mode "Randomization mode control"
-	${1:variable}.rand_mode(${2:0});
+snippet rand_mode "Rand mode (0/1)"
+	${1:var}.rand_mode(${2:0});
 
-snippet this "This keyword"
-	this.${1:member}
+snippet constraint_mode_specific "Specific constraint mode"
+	${1:obj}.${2:constraint_name}.constraint_mode(${3:0});
 
-snippet super "Super keyword"
-	super.${1:method}(${2});
-
-snippet new_array "Dynamic array new"
+snippet new_array "Dynamic array allocation"
 	${1:array} = new[${2:size}];
 
-snippet new_copy "Copy constructor"
-	${1:object} = new ${2:original};
+snippet new_copy "Shallow copy (new rhs)"
+	${1:dest} = new ${2:src};
 
-# =============================================================================
-# PACKAGE IMPORT AND EXPORT
-# =============================================================================
+snippet cast_dynamic "Dynamic Cast ($cast)"
+	if (!\$cast(${1:dest}, ${2:src})) begin
+		\`uvm_error("CAST", "Dynamic cast failed")
+	end
 
-snippet import_pkg "Import package"
-	import ${1:package_name}::${2:*};
+# ============================================================================
+# PACKAGES
+# ============================================================================
 
-snippet export_pkg "Export from package"
-	export ${1:package_name}::${2:*};
+snippet package "Package Definition (Universal)"
+	package ${1:$TM_FILENAME_BASE};
+		
+		import uvm_pkg::*;
+		\`include "uvm_macros.svh"
+		
+		${0}
+		
+	endpackage: $1
 
-snippet import_item "Import specific item"
-	import ${1:package_name}::${2:item_name};
+snippet import_pkg "Import Package"
+	import ${1:pkg_name}::*;
 
-# =============================================================================
+snippet import_item "Import Specific Item"
+	import ${1:pkg_name}::${2:item};
+
+snippet export_pkg "Export Package (Chaining)"
+	export ${1:pkg_name}::*;
+
+# ============================================================================
 # VIRTUAL INTERFACES
-# =============================================================================
+# ============================================================================
 
-snippet virtual_interface "Virtual interface declaration"
+snippet vif "Virtual Interface Declaration"
 	virtual ${1:interface_name} ${2:vif};
 
-snippet virtual_interface_param "Parameterized virtual interface"
-	virtual ${1:interface_name}#(${2:params}) ${3:vif};
+snippet vif_param "Parameterized Virtual Interface"
+	virtual ${1:interface_name} #(${2:params}) ${3:vif};
 
-# =============================================================================
-# DPI (Direct Programming Interface)
-# =============================================================================
+snippet typedef_vif "Typedef Virtual Interface"
+	typedef virtual ${1:interface_name} ${2:vif_t};
 
-snippet dpi_import "DPI-C import"
-	import "DPI-C" function ${1:return_type} ${2:function_name}(${3:args});
+# ============================================================================
+# DPI-C (Direct Programming Interface)
+# ============================================================================
 
-snippet dpi_export "DPI-C export"
-	export "DPI-C" function ${1:function_name};
+snippet dpi_import "DPI-C Import (Standard)"
+	import "DPI-C" function ${1:void} ${2:c_func_name}(${3:input int arg});
 
-snippet dpi_context "DPI-C context import"
-	import "DPI-C" context function ${1:return_type} ${2:function_name}(${3:args});
+snippet dpi_context "DPI-C Import (Context - Can call SV)"
+	// Use 'context' if C code calls exported SV functions
+	import "DPI-C" context function ${1:void} ${2:c_func_name}(${3:args});
 
-snippet dpi_pure "DPI-C pure function"
-	import "DPI-C" pure function ${1:return_type} ${2:function_name}(${3:args});
+snippet dpi_pure "DPI-C Import (Pure - No Side Effects)"
+	// Use 'pure' for math functions (optimizable, no globals)
+	import "DPI-C" pure function ${1:int} ${2:c_math_func}(${3:args});
 
-# =============================================================================
-# PROGRAM BLOCKS (Advanced)
-# =============================================================================
+snippet dpi_export "DPI-C Export (Allow C to call SV)"
+	export "DPI-C" function ${1:sv_func_name};
+# ============================================================================
+# PROGRAM BLOCKS (Testbench Container)
+# Note: In modern UVM, 'module' or 'interface' is preferred over 'program'.
+# ============================================================================
 
-snippet program_clocking "Program with clocking"
-	program ${1:`expand('%:t:r')`} (
-	    ${2:interface_name}.${3:modport} ${4:port}
+snippet program "Program Block"
+	program ${1:prog_name} (
+		input logic ${2:clk},
+		input logic ${3:rst_n},
+		${4:interface_name} ${5:vif}
 	);
-	    clocking ${5:cb} @(posedge ${4}.clk);
-	        ${6}
-	    endclocking
-	    
-	    initial begin
-	        ${0}
-	    end
+		initial begin
+			${0}
+		end
 	endprogram: $1
 
-# =============================================================================
-# CONFIG AND BIND
-# =============================================================================
+# ============================================================================
+# CONFIGURATIONS (Library Mapping)
+# ============================================================================
 
-snippet config "Configuration"
-	config ${1:config_name};
-	    design ${2:top_module};
-	    ${3}
+snippet config "Config Block"
+	config ${1:cfg_name};
+		design ${2:library}.${3:top_module};
+		default liblist ${4:work};
+		${5}
 	endconfig: $1
 
-snippet cell_config "Cell configuration"
-	cell ${1:instance_path} use ${2:library}.${3:cell};
+snippet config_cell "Cell Override"
+	cell ${1:inst_path} use ${2:lib}.${3:cell};
 
-snippet instance_config "Instance configuration"
-	instance ${1:instance_path} use ${2:configuration};
+snippet config_instance "Instance Override"
+	instance ${1:inst_path} use ${2:lib}.${3:module};
 
-# =============================================================================
-# SPECIFY BLOCKS (Timing)
-# =============================================================================
+# ============================================================================
+# SPECIFY BLOCKS (Gate Level Timing)
+# ============================================================================
 
-snippet specify "Specify block"
+snippet specify "Specify Block"
 	specify
-	    specparam ${1:tPD} = ${2:10};
-	    (${3:input} => ${4:output}) = $1;
+		specparam ${1:tPD} = ${2:1.0};
+		(${3:input} => ${4:output}) = $1;
 	endspecify
 
-snippet setuphold "Setup/Hold timing check"
-	\$setuphold(posedge ${1:clk}, ${2:data}, ${3:setup_time}, ${4:hold_time});
+snippet spec_setuphold "Setup/Hold Check"
+	\$setuphold(posedge ${1:clk}, ${2:data}, ${3:setup_limit}, ${4:hold_limit});
 
-snippet width_check "Width timing check"
-	\$width(posedge ${1:signal}, ${2:min_width});
+snippet spec_width "Pulse Width Check"
+	\$width(posedge ${1:sig}, ${2:min_width});
 
-snippet period_check "Period timing check"
+snippet spec_period "Period Check"
 	\$period(posedge ${1:clk}, ${2:min_period});
 
-# =============================================================================
-# UNIQUE, PRIORITY, UNIQUE0
-# =============================================================================
+snippet spec_skew "Skew Check"
+	\$skew(posedge ${1:ref_clk}, posedge ${2:data_clk}, ${3:limit});
 
-snippet unique_if "Unique if"
-	unique if (${1:condition}) begin
-	    ${2}
-	end else if (${3:condition}) begin
-	    ${4}
+# ============================================================================
+# UNIQUE / PRIORITY (Case & If)
+# ============================================================================
+
+snippet unique_if "Unique If (Parallel, No Overlap)"
+	unique if (${1:cond}) begin
+		${2}
+	end else if (${3:cond}) begin
+		${4}
+	end else begin
+		${5}
 	end
 
-snippet priority_if "Priority if"
-	priority if (${1:condition}) begin
-	    ${2}
-	end else if (${3:condition}) begin
-	    ${4}
+snippet priority_if "Priority If (Sequential)"
+	priority if (${1:cond}) begin
+		${2}
+	end else if (${3:cond}) begin
+		${4}
 	end
 
-snippet unique0_case "Unique0 case"
-	unique0 case (${1:expression})
-	    ${2:value}: ${3}
-	    default: ${4}
+snippet unique_case "Unique Case (Parallel)"
+	unique case (${1:expr})
+		${2:val}: ${3:stmt};
+		default: ${4:stmt};
 	endcase
 
-# =============================================================================
-# STREAMING OPERATORS
-# =============================================================================
+snippet priority_case "Priority Case (Sequential)"
+	priority case (${1:expr})
+		${2:val}: ${3:stmt};
+		default: ${4:stmt};
+	endcase
 
-snippet stream_pack "Streaming pack operator"
-	{<<{${1:data}}}
+# ============================================================================
+# STREAMING OPERATORS (Pack/Unpack)
+# ============================================================================
 
-snippet stream_unpack "Streaming unpack operator"
-	{>>{${1:data}}}
+snippet stream_pack "Pack {<<{src}}"
+	{<<${1:slice_size}{ ${2:source} }}
 
-snippet stream_slice "Streaming with slice"
-	{<<${1:8}{${2:data}}}
+snippet stream_unpack "Unpack {>>{dest}}"
+	{>>${1:slice_size}{ ${2:dest} }}
 
-# =============================================================================
-# ARRAY METHODS
-# =============================================================================
+snippet endian_swap "Endian Swap (32-bit)"
+	{<<8{ ${1:word} }}
 
-snippet array_size "Array size method"
-	${1:array}.size()
+# ============================================================================
+# ARRAY METHODS (Locator & Ordering)
+# Returns: QUEUE ($)
+# ============================================================================
 
-snippet array_delete "Array delete method"
-	${1:array}.delete(${2:index});
+snippet arr_find "Find with condition"
+	${1:q} = ${2:arr}.find(item) with (${3:item > 5});
 
-snippet array_exists "Array exists method"
-	${1:array}.exists(${2:index})
+snippet arr_find_index "Find Index"
+	${1:q_idx} = ${2:arr}.find_index(item) with (${3:item == val});
 
-snippet array_first "Array first method"
-	${1:array}.first(${2:index})
+snippet arr_find_first "Find First"
+	${1:q} = ${2:arr}.find_first(item) with (${3:item > val});
 
-snippet array_last "Array last method"
-	${1:array}.last(${2:index})
+snippet arr_find_first_index "Find First Index"
+	${1:q_idx} = ${2:arr}.find_first_index(item) with (${3:item == val});
 
-snippet array_next "Array next method"
-	${1:array}.next(${2:index})
+snippet arr_unique "Unique Values"
+	${1:q} = ${2:arr}.unique();
 
-snippet array_prev "Array prev method"
-	${1:array}.prev(${2:index})
+snippet arr_sort "Sort (In-Place)"
+	${1:arr}.sort();
 
-snippet array_find "Array find method"
-	${1:array}.find(${2:item}) with (${3:item} == ${4:value})
+snippet arr_rsort "Reverse Sort (In-Place)"
+	${1:arr}.rsort();
 
-snippet array_find_index "Array find_index method"
-	${1:array}.find_index with (${2:item} == ${3:value})
+snippet arr_shuffle "Shuffle (Randomize)"
+	${1:arr}.shuffle();
 
-snippet array_find_first "Array find_first method"
-	${1:array}.find_first with (${2:item} > ${3:value})
+snippet arr_reverse "Reverse (In-Place)"
+	${1:arr}.reverse();
 
-snippet array_min "Array min method"
-	${1:array}.min()
+# ============================================================================
+# ARRAY METHODS (Reduction)
+# Returns: Scalar (int, bit, etc.)
+# ============================================================================
 
-snippet array_max "Array max method"
-	${1:array}.max()
+snippet arr_sum "Sum (Safe width)"
+	// sum() returns width of element unless casted
+	${1:total} = ${2:arr}.sum() with (int'(item));
 
-snippet array_sum "Array sum method"
-	${1:array}.sum()
+snippet arr_product "Product"
+	${1:total} = ${2:arr}.product() with (int'(item));
 
-snippet array_product "Array product method"
-	${1:array}.product()
+snippet arr_xor "Xor Reduction"
+	${1:res} = ${2:arr}.xor() with (item);
 
-snippet array_and "Array and method"
-	${1:array}.and()
+snippet arr_and "And Reduction"
+	${1:res} = ${2:arr}.and() with (item);
 
-snippet array_or "Array or method"
-	${1:array}.or()
+snippet arr_or "Or Reduction"
+	${1:res} = ${2:arr}.or() with (item);
 
-snippet array_xor "Array xor method"
-	${1:array}.xor()
+snippet arr_min "Min Value"
+	${1:val} = ${2:arr}.min();
 
-snippet array_unique "Array unique method"
-	${1:array}.unique()
-
-snippet array_sort "Array sort method"
-	${1:array}.sort()
-
-snippet array_rsort "Array reverse sort method"
-	${1:array}.rsort()
-
-snippet array_reverse "Array reverse method"
-	${1:array}.reverse()
-
-snippet array_shuffle "Array shuffle method"
-	${1:array}.shuffle()
-
+snippet arr_max "Max Value"
+	${1:val} = ${2:arr}.max();
 # =============================================================================
 # STRING METHODS
 # =============================================================================
@@ -2147,248 +2218,966 @@ snippet default_clocking "Default clocking"
 snippet default_disable "Default disable"
 	default disable iff ${1:reset};
 
-# =============================================================================
-# COVERAGE OPTIONS
-# =============================================================================
+# ============================================================================
+# COVERAGE OPTIONS (Instance Level)
+# Affects specific instances (per_instance, weight, etc.)
+# ============================================================================
 
-snippet covergroup_option "Covergroup options"
-	option.name = "${1:name}";
-	option.weight = ${2:1};
-	option.goal = ${3:100};
-	option.comment = "${4:comment}";
-	option.at_least = ${5:1};
-	option.auto_bin_max = ${6:64};
-	option.per_instance = ${7:0};
+snippet option_all "All Instance Options"
+	option.name            = "${1:name}";
+	option.weight          = ${2:1};
+	option.goal            = ${3:100};
+	option.comment         = "${4:comment}";
+	option.at_least        = ${5:1};
+	option.auto_bin_max    = ${6:64};
+	option.per_instance    = ${7:1};
 	option.get_inst_coverage = ${8:0};
 
-snippet coverpoint_option "Coverpoint options"
-	option.weight = ${1:1};
-	option.goal = ${2:100};
-	option.comment = "${3:comment}";
-	option.at_least = ${4:1};
-	option.auto_bin_max = ${5:64};
+snippet option_per_instance "Per Instance Reporting"
+	option.per_instance = 1;
 
-# =============================================================================
-# WILDCARD BINS
-# =============================================================================
+snippet option_weight "Coverage Weight"
+	option.weight = ${1:0}; // Set to 0 to exclude from total grade
 
-snippet bins_wildcard "Wildcard bins"
-	wildcard bins ${1:name} = {${2:4'b10??}};
+snippet option_goal "Coverage Goal"
+	option.goal = ${1:100};
 
-snippet bins_transition "Transition bins"
-	bins ${1:name} = (${2:val1} => ${3:val2} => ${4:val3});
+# ============================================================================
+# TYPE OPTIONS (Static Level)
+# Affects the cumulative type (merge_instances, etc.)
+# ============================================================================
 
-snippet bins_sequence "Sequence bins"
-	bins ${1:name} = (${2:val1}[*${3:2}] => ${4:val2});
+snippet type_option_all "All Type Options"
+	type_option.weight          = ${1:1};
+	type_option.goal            = ${2:100};
+	type_option.comment         = "${3:comment}";
+	type_option.merge_instances = ${4:1}; // Merge all instances for total calc
 
-# =============================================================================
-# RANDSEQUENCE
-# =============================================================================
+snippet type_option_merge "Merge Instances"
+	// Combine coverage from all instances into one 'type' bucket
+	type_option.merge_instances = 1;
 
-snippet randsequence "Random sequence"
-	randsequence(${1:production})
-	    ${1}: ${2:item1} ${3:| item2};
-	    $2: ${4:/* actions */};
-	    $3: ${5:/* actions */};
+# ============================================================================
+# ADVANCED BINS (Wildcard & Transitions)
+# ============================================================================
+
+snippet bins_wildcard "Wildcard Bins"
+	// Matches using ? or z/x (e.g., 4'b11??)
+	wildcard bins ${1:bin_name} = {${2:4'b10??}};
+
+snippet bins_ignore "Ignore Bins (Exclude values)"
+	ignore_bins ${1:ign} = {${2:val}};
+
+snippet bins_illegal "Illegal Bins (Error if hit)"
+	illegal_bins ${1:ill} = {${2:val}};
+
+snippet bins_trans "Transition Bin (=>)"
+	// Sequence: val1 followed by val2
+	bins ${1:trans} = (${2:val1} => ${3:val2});
+
+snippet bins_trans_list "Transition Bin List"
+	// Sequence: 1->2, OR 2->3, OR 5->1
+	bins ${1:trans}[] = (${2:1} => ${3:2}), (${4:2} => ${5:3});
+
+snippet bins_repeat "Consecutive Repetition [*n]"
+	// val repeats n times consecutively: 1 -> 1 -> 1
+	bins ${1:rep} = (${2:val}[*${3:3}]);
+
+snippet bins_goto "Goto Repetition [->n]"
+	// val occurs n times (non-consecutive), immediately followed by next val
+	// 1...1...1 => 2 (The transition happens immediately after the last 1)
+	bins ${1:goto} = (${2:1}[->${3:3}] => ${4:2});
+
+snippet bins_noncons "Non-consecutive Repetition [=n]"
+	// val occurs n times (anywhere), eventually followed by next val
+	// 1...1...1... => ...2
+	bins ${1:noncons} = (${2:1}[=${3:3}] => ${4:2});
+
+# ============================================================================
+# RANDSEQUENCE (Procedural Randomization)
+# ============================================================================
+
+snippet randsequence "Random Sequence (Production Rules)"
+	randsequence(${1:main_rule})
+		${1}: ${2:first_action} ${3:second_action};
+		$2: { \$display("Action 1"); };
+		$3: { \$display("Action 2"); };
 	endsequence
 
-# =============================================================================
-# SOFT CONSTRAINTS
-# =============================================================================
+# ============================================================================
+# CONSTRAINTS - DISTRIBUTION & SOFT
+# ============================================================================
 
-snippet soft_constraint "Soft constraint"
+snippet constraint_soft "Soft Constraint"
 	constraint ${1:name}_c {
-	    soft ${2:variable} == ${3:value};
+		soft ${2:variable} == ${3:value};
 	}
 
-# =============================================================================
-# DIST CONSTRAINTS (Advanced)
-# =============================================================================
-
-snippet dist_weight "Distribution with weight"
-	${1:variable} dist {
-	    ${2:value1} := ${3:weight1},
-	    ${4:value2} := ${5:weight2},
-	    [${6:min}:${7:max}] := ${8:weight3}
-	};
-
-snippet dist_equal "Distribution with equal probability"
-	${1:variable} dist {
-	    ${2:value1}, ${3:value2}, ${4:value3}
-	};
-
-# =============================================================================
-# IMPLICATION CONSTRAINTS
-# =============================================================================
-
-snippet constraint_implication "Constraint implication"
+snippet constraint_dist "Distribution (Standard :=)"
+	// := Operator: Weight applies to EACH item/value
 	constraint ${1:name}_c {
-	    ${2:condition} -> ${3:constraint};
+		${2:var} dist {
+			${3:val1} := ${4:weight1},
+			${5:val2} := ${6:weight2},
+			[${7:min}:${8:max}] := ${9:weight3}
+		};
 	}
 
-snippet constraint_if "Constraint if-else"
+snippet constraint_dist_range "Distribution (Range :/)"
+	// :/ Operator: Weight is SPLIT across the range
 	constraint ${1:name}_c {
-	    if (${2:condition})
-	        ${3:constraint1}
-	    else
-	        ${4:constraint2}
+		${2:var} dist {
+			[${3:min}:${4:max}] :/ ${5:total_weight}
+		};
 	}
 
-# =============================================================================
-# FOREACH IN CONSTRAINTS
-# =============================================================================
-
-snippet constraint_foreach "Foreach in constraint"
+snippet constraint_dist_equal "Distribution (Equal Probability)"
 	constraint ${1:name}_c {
-	    foreach (${2:array}[${3:i}])
-	        ${2}[$3] ${4:inside {[0:10]}};
+		${2:var} dist {
+			${3:val1} := 1,
+			${4:val2} := 1
+		};
 	}
 
-# =============================================================================
-# UNIQUE IN CONSTRAINTS
-# =============================================================================
+# ============================================================================
+# CONSTRAINTS - LOGIC & FLOW
+# ============================================================================
 
-snippet constraint_unique "Unique constraint"
+snippet constraint_implication "Implication (->)"
 	constraint ${1:name}_c {
-	    unique {${2:var1}, ${3:var2}, ${4:var3}};
+		(${2:condition}) -> (${3:constraint_expr});
 	}
 
-# =============================================================================
-# INLINE RANDOMIZATION
-# =============================================================================
-
-snippet randomize_inline "Inline randomization"
-	std::randomize(${1:variable}) with {
-	    $1 ${2:inside {[0:100]}};
-	};
-
-# =============================================================================
-# CROSS COVERAGE (Advanced)
-# =============================================================================
-
-snippet cross_binsof "Cross with binsof"
-	${1:name}_cross: cross ${2:cp1}, ${3:cp2} {
-	    ignore_bins ${4:ignore} = binsof(${2}) intersect {${5:values}};
+snippet constraint_if "If-Else Constraint"
+	constraint ${1:name}_c {
+		if (${2:condition}) {
+			${3:constraint_true};
+		} else {
+			${4:constraint_false};
+		}
 	}
 
-snippet cross_iff "Cross with iff"
-	${1:name}_cross: cross ${2:cp1}, ${3:cp2} iff (${4:condition});
+snippet constraint_foreach "Foreach Constraint"
+	constraint ${1:name}_c {
+		foreach (${2:array}[i]) {
+			${2}[i] ${3:inside {[0:255]}};
+		}
+	}
 
-# =============================================================================
-# SYSTEM FUNCTIONS (Additional)
-# =============================================================================
+snippet constraint_unique "Unique Constraint (SV 2012)"
+	constraint ${1:name}_c {
+		unique { ${2:list_of_vars_or_array} };
+	}
 
-snippet countones "Count ones"
-	\$countones(${1:expression})
+snippet constraint_order "Solve...Before"
+	constraint ${1:order}_c {
+		solve ${2:control_var} before ${3:dependent_var};
+	}
 
-snippet countbits "Count bits"
-	\$countbits(${1:expression}, ${2:'1})
+# ============================================================================
+# INLINE RANDOMIZATION (Scope Randomize)
+# ============================================================================
 
-snippet onehot "One-hot check"
-	\$onehot(${1:expression})
+snippet randomize_scope "std::randomize (Scope/Variable)"
+	if (!std::randomize(${1:variable}) with {
+		$1 inside {[${2:min}:${3:max}]};
+	}) begin
+		\`uvm_error("RND", "Randomization failed for $1")
+	end
 
-snippet onehot0 "One-hot or zero check"
-	\$onehot0(${1:expression})
+# ============================================================================
+# CROSS COVERAGE (Advanced Filtering)
+# ============================================================================
 
-snippet isunknown "Is unknown check"
-	\$isunknown(${1:expression})
+snippet cross_basic "Basic Cross"
+	${1:name}_x: cross ${2:cp1}, ${3:cp2};
 
-snippet bits "Bits function"
-	\$bits(${1:expression})
+snippet cross_binsof "Cross with binsof (Ignore specific combos)"
+	${1:name}_x: cross ${2:cp1}, ${3:cp2} {
+		// Ignore cases where cp1 is 'val'
+		ignore_bins ${4:ign_name} = binsof($2) intersect {${5:val}};
+	}
 
-snippet typename "Type name"
-	\$typename(${1:expression})
+snippet cross_iff "Cross with iff (Conditional)"
+	${1:name}_x: cross ${2:cp1}, ${3:cp2} iff (${4:enable_signal});
+# ============================================================================
+# SYSTEM FUNCTIONS (Bit & Array Query)
+# ============================================================================
 
-snippet high "High index"
-	\$high(${1:array})
+snippet countones "Count Ones ($countones)"
+	\$countones(${1:expr})
 
-snippet low "Low index"
-	\$low(${1:array})
+snippet countbits "Count Bits ($countbits)"
+	// Count number of bits matching the mask (e.g., '0, '1, 'x, 'z)
+	\$countbits(${1:expr}, ${2:'1})
 
-snippet left "Left index"
-	\$left(${1:array})
+snippet onehot "One-hot Check ($onehot)"
+	// True if exactly one bit is 1
+	\$onehot(${1:expr})
 
-snippet right "Right index"
-	\$right(${1:array})
+snippet onehot0 "One-hot-or-Zero Check ($onehot0)"
+	// True if zero or one bit is 1
+	\$onehot0(${1:expr})
 
-snippet increment "Increment"
-	\$increment(${1:array})
+snippet isunknown "Unknown Check ($isunknown)"
+	// True if any bit is X or Z
+	\$isunknown(${1:expr})
 
-snippet size "Size function"
-	\$size(${1:array}, ${2:dimension})
+snippet bits "Bit Width ($bits)"
+	\$bits(${1:type_or_expr})
 
-snippet dimensions "Dimensions"
+snippet clog2 "Ceiling Log2 (Calc Width)"
+	// Standard way to calculate address width: localparam AW = $clog2(DEPTH);
+	\$clog2(${1:depth})
+
+snippet typename "Type Name String ($typename)"
+	\$typename(${1:expr})
+
+# --- Array Query Functions ---
+
+snippet size "Array Size ($size)"
+	${1:array}.size()
+
+snippet high "High Index ($high)"
+	\$high(${1:array}, ${2:0})
+
+snippet low "Low Index ($low)"
+	\$low(${1:array}, ${2:0})
+
+snippet dimensions "Dimensions ($dimensions)"
 	\$dimensions(${1:array})
 
-snippet unpacked_dimensions "Unpacked dimensions"
-	\$unpacked_dimensions(${1:array})
+# ============================================================================
+# SEVERITY SYSTEM TASKS (RTL & TB)
+# ============================================================================
 
-# =============================================================================
-# SEVERITY SYSTEM TASKS
-# =============================================================================
+snippet fatal "Fatal Error (Stops Sim)"
+	\$fatal(${1:1}, "${2:Message}: %${3:d}", ${4:arg});
 
-snippet fatal "Fatal system task"
-	\$fatal(${1:finish_number}, "${2:message}", ${3:args});
+snippet error "Error (Counted)"
+	\$error("${1:Message}: %${2:d}", ${3:arg});
 
-snippet error "Error system task"
-	\$error("${1:message}", ${2:args});
+snippet warning "Warning"
+	\$warning("${1:Message}: %${2:d}", ${3:arg});
 
-snippet warning "Warning system task"
-	\$warning("${1:message}", ${2:args});
+snippet info "Info (Message)"
+	\$info("${1:Message}: %${2:d}", ${3:arg});
 
-snippet info "Info system task"
-	\$info("${1:message}", ${2:args});
+# ============================================================================
+# UVM HDL ACCESS (Backdoor Access)
+# Requires: import uvm_pkg::*;
+# ============================================================================
 
+snippet uvm_hdl_read "UVM HDL Read (Safe)"
+	${1:val_var} = 0;
+	if (!uvm_hdl_read("${2:top.dut.signal}", $1)) begin
+		\`uvm_error("HDL_READ", "Failed to read path: $2")
+	end
 
-# =============================================================================
-# UVM HDL ACCESS (uvm_hdl_read/force/deposit)
-# =============================================================================
+snippet uvm_hdl_force "UVM HDL Force (Freeze Value)"
+	// Force holds the value (like Verilog force) until release
+	if (!uvm_hdl_force("${1:top.dut.signal}", ${2:value})) begin
+		\`uvm_error("HDL_FORCE", "Failed to force path: $1")
+	end
 
-snippet uvm_hdl_read "UVM HDL Read"
-	uvm_hdl_read("${1:hdl_path}", ${2:value});
-
-snippet uvm_hdl_force "UVM HDL Force"
-	uvm_hdl_force("${1:hdl_path}", ${2:value});
+snippet uvm_hdl_deposit "UVM HDL Deposit (Set Value)"
+	// Deposit sets value now, but can be overwritten by DUT drivers
+	if (!uvm_hdl_deposit("${1:top.dut.signal}", ${2:value})) begin
+		\`uvm_error("HDL_DEP", "Failed to deposit path: $1")
+	end
 
 snippet uvm_hdl_release "UVM HDL Release"
-	uvm_hdl_release("${1:hdl_path}");
+	if (!uvm_hdl_release("${1:top.dut.signal}")) begin
+		\`uvm_error("HDL_REL", "Failed to release path: $1")
+	end
 
-snippet uvm_hdl_deposit "UVM HDL Deposit"
-	uvm_hdl_deposit("${1:hdl_path}", ${2:value});
+snippet uvm_hdl_check "UVM HDL Check Path Exists"
+	if (uvm_hdl_check_path("${1:top.dut.signal}")) begin
+		${2:// Path exists logic}
+	end else begin
+		\`uvm_warning("HDL_CHECK", "Path does not exist: $1")
+	end
+# ============================================================================
+# SIMULATION CONTROL TASKS
+# ============================================================================
 
-snippet uvm_hdl_check_path "UVM HDL Check Path"
-	uvm_hdl_check_path("${1:hdl_path}");
+snippet finish "Finish Simulation ($finish)"
+	// 0: none, 1: time, 2: time + memory
+	\$finish(${1:2});
 
-snippet uvm_hdl_read_string "UVM HDL Read String"
-	uvm_hdl_read_string("${1:hdl_path}", ${2:str_value});
+snippet stop "Stop Simulation / Breakpoint ($stop)"
+	// Enters interactive mode (breakpoint)
+	\$stop(${1:2});
 
-snippet uvm_hdl_force_string "UVM HDL Force String"
-	uvm_hdl_force_string("${1:hdl_path}", "${2:str_value}");
+snippet timeformat "Set Time Format"
+	// unit_num, precision, suffix, min_field_width
+	\$timeformat(${1:-9}, ${2:3}, " ${3:ns}", ${4:8});
 
-snippet uvm_hdl_deposit_string "UVM HDL Deposit String"
-	uvm_hdl_deposit_string("${1:hdl_path}", "${2:str_value}");
+snippet save "Save Simulation State"
+	\$save("${1:checkpoint_name}");
 
-# =============================================================================
-# SYSTEMVERILOG SIMULATION CONTROL TASKS
-# =============================================================================
+snippet restart "Restart Simulation"
+	\$restart("${1:checkpoint_name}");
 
-snippet finish "Finish simulation"
-	\$finish;
+snippet exit "Exit Simulator (Aggressive)"
+	\$exit;
 
-snippet stop "Stop simulation"
-	\$stop;
+# ============================================================================
+# EVENT CONTROL
+# ============================================================================
 
-snippet restart "Restart simulation"
-	\$restart;
+snippet wait_order "Wait Order (Strict)"
+	wait_order(${1:a}, ${2:b}, ${3:c})
+		else \`uvm_error("ORDER", "Events out of order");
 
-snippet reset "Reset simulation"
-	\$reset;
+snippet wait_trigger "Wait Event"
+	@(${1:event_name});
 
-snippet save "Save simulation state"
-	\$save;
+snippet trigger "Trigger Event"
+	-> ${1:event_name};
 
-snippet restore "Restore simulation state"
-	\$restore;
+snippet trigger_nonblock "Trigger Event (Non-blocking)"
+	->> ${1:event_name};
 
-snippet checkpoint "Simulation checkpoint"
-	\$checkpoint;
+
+# ============================================================================
+# UVM COMMON PHASES (Inline Implementation)
+# Use these inside the class body.
+# Note: Standard UVM does NOT have pre/post_build, pre/post_connect, etc.
+# ============================================================================
+
+snippet phase_build "build_phase"
+	virtual function void build_phase(uvm_phase phase);
+		super.build_phase(phase);
+		${1}
+	endfunction: build_phase
+
+snippet phase_connect "connect_phase"
+	virtual function void connect_phase(uvm_phase phase);
+		super.connect_phase(phase);
+		${1}
+	endfunction: connect_phase
+
+snippet phase_end_of_elaboration "end_of_elaboration_phase"
+	virtual function void end_of_elaboration_phase(uvm_phase phase);
+		super.end_of_elaboration_phase(phase);
+		${1}
+	endfunction: end_of_elaboration_phase
+
+snippet phase_start_of_simulation "start_of_simulation_phase"
+	virtual function void start_of_simulation_phase(uvm_phase phase);
+		super.start_of_simulation_phase(phase);
+		${1}
+	endfunction: start_of_simulation_phase
+
+snippet phase_run "run_phase"
+	virtual task run_phase(uvm_phase phase);
+		super.run_phase(phase);
+		${1}
+	endtask: run_phase
+
+snippet phase_extract "extract_phase"
+	virtual function void extract_phase(uvm_phase phase);
+		super.extract_phase(phase);
+		${1}
+	endfunction: extract_phase
+
+snippet phase_check "check_phase"
+	virtual function void check_phase(uvm_phase phase);
+		super.check_phase(phase);
+		${1}
+	endfunction: check_phase
+
+snippet phase_report "report_phase"
+	virtual function void report_phase(uvm_phase phase);
+		super.report_phase(phase);
+		${1}
+	endfunction: report_phase
+
+snippet phase_final "final_phase"
+	virtual function void final_phase(uvm_phase phase);
+		super.final_phase(phase);
+		${1}
+	endfunction: final_phase
+
+# ============================================================================
+# UVM RUN-TIME PHASES (12-Phase Triads)
+# These DO have pre_ and post_ sub-phases.
+# ============================================================================
+
+# --- Reset Group ---
+snippet phase_pre_reset "pre_reset_phase"
+	virtual task pre_reset_phase(uvm_phase phase);
+		super.pre_reset_phase(phase);
+		${1}
+	endtask: pre_reset_phase
+
+snippet phase_reset "reset_phase"
+	virtual task reset_phase(uvm_phase phase);
+		super.reset_phase(phase);
+		${1}
+	endtask: reset_phase
+
+snippet phase_post_reset "post_reset_phase"
+	virtual task post_reset_phase(uvm_phase phase);
+		super.post_reset_phase(phase);
+		${1}
+	endtask: post_reset_phase
+
+# --- Configure Group ---
+snippet phase_pre_configure "pre_configure_phase"
+	virtual task pre_configure_phase(uvm_phase phase);
+		super.pre_configure_phase(phase);
+		${1}
+	endtask: pre_configure_phase
+
+snippet phase_configure "configure_phase"
+	virtual task configure_phase(uvm_phase phase);
+		super.configure_phase(phase);
+		${1}
+	endtask: configure_phase
+
+snippet phase_post_configure "post_configure_phase"
+	virtual task post_configure_phase(uvm_phase phase);
+		super.post_configure_phase(phase);
+		${1}
+	endtask: post_configure_phase
+
+# --- Main Group ---
+snippet phase_pre_main "pre_main_phase"
+	virtual task pre_main_phase(uvm_phase phase);
+		super.pre_main_phase(phase);
+		${1}
+	endtask: pre_main_phase
+
+snippet phase_main "main_phase"
+	virtual task main_phase(uvm_phase phase);
+		super.main_phase(phase);
+		${1}
+	endtask: main_phase
+
+snippet phase_post_main "post_main_phase"
+	virtual task post_main_phase(uvm_phase phase);
+		super.post_main_phase(phase);
+		${1}
+	endtask: post_main_phase
+
+# --- Shutdown Group ---
+snippet phase_pre_shutdown "pre_shutdown_phase"
+	virtual task pre_shutdown_phase(uvm_phase phase);
+		super.pre_shutdown_phase(phase);
+		${1}
+	endtask: pre_shutdown_phase
+
+snippet phase_shutdown "shutdown_phase"
+	virtual task shutdown_phase(uvm_phase phase);
+		super.shutdown_phase(phase);
+		${1}
+	endtask: shutdown_phase
+
+snippet phase_post_shutdown "post_shutdown_phase"
+	virtual task post_shutdown_phase(uvm_phase phase);
+		super.post_shutdown_phase(phase);
+		${1}
+	endtask: post_shutdown_phase
+
+# ============================================================================
+# EXTERN DECLARATIONS (For Class Header)
+# ============================================================================
+
+snippet extern_build "extern build_phase"
+	extern virtual function void build_phase(uvm_phase phase);
+
+snippet extern_connect "extern connect_phase"
+	extern virtual function void connect_phase(uvm_phase phase);
+
+snippet extern_start_of_sim "extern start_of_simulation"
+	extern virtual function void start_of_simulation_phase(uvm_phase phase);
+
+snippet extern_run "extern run_phase"
+	extern virtual task run_phase(uvm_phase phase);
+
+snippet extern_extract "extern extract_phase"
+	extern virtual function void extract_phase(uvm_phase phase);
+
+snippet extern_check "extern check_phase"
+	extern virtual function void check_phase(uvm_phase phase);
+
+snippet extern_report "extern report_phase"
+	extern virtual function void report_phase(uvm_phase phase);
+
+snippet extern_final "extern final_phase"
+	extern virtual function void final_phase(uvm_phase phase);
+
+# ============================================================================
+# OUT-OF-BODY IMPLEMENTATION (Extern Method Implementation)
+# Usage: Use these AFTER 'endclass' to implement extern methods.
+# Note: Automatically fills ClassName based on filename.
+# ============================================================================
+
+# ============================================================================
+# OUT-OF-BODY IMPLEMENTATION (Extern Method Implementation)
+# Usage: Use these AFTER 'endclass' to implement extern methods.
+# Trigger: [phase_name]_impl (e.g., build_impl, run_impl)
+# Note: Automatically fills ClassName based on filename ($TM_FILENAME_BASE).
+# ============================================================================
+
+snippet build_impl "Impl: build_phase"
+	function void ${1:$TM_FILENAME_BASE}::build_phase(uvm_phase phase);
+		super.build_phase(phase);
+		${2}
+	endfunction: build_phase
+
+snippet connect_impl "Impl: connect_phase"
+	function void ${1:$TM_FILENAME_BASE}::connect_phase(uvm_phase phase);
+		super.connect_phase(phase);
+		${2}
+	endfunction: connect_phase
+
+snippet end_of_elaboration_impl "Impl: end_of_elaboration_phase"
+	function void ${1:$TM_FILENAME_BASE}::end_of_elaboration_phase(uvm_phase phase);
+		super.end_of_elaboration_phase(phase);
+		${2}
+	endfunction: end_of_elaboration_phase
+
+snippet start_of_simulation_impl "Impl: start_of_simulation_phase"
+	function void ${1:$TM_FILENAME_BASE}::start_of_simulation_phase(uvm_phase phase);
+		super.start_of_simulation_phase(phase);
+		${2}
+	endfunction: start_of_simulation_phase
+
+snippet run_impl "Impl: run_phase"
+	task ${1:$TM_FILENAME_BASE}::run_phase(uvm_phase phase);
+		super.run_phase(phase);
+		${2}
+	endtask: run_phase
+
+snippet extract_impl "Impl: extract_phase"
+	function void ${1:$TM_FILENAME_BASE}::extract_phase(uvm_phase phase);
+		super.extract_phase(phase);
+		${2}
+	endfunction: extract_phase
+
+snippet check_impl "Impl: check_phase"
+	function void ${1:$TM_FILENAME_BASE}::check_phase(uvm_phase phase);
+		super.check_phase(phase);
+		${2}
+	endfunction: check_phase
+
+snippet report_impl "Impl: report_phase"
+	function void ${1:$TM_FILENAME_BASE}::report_phase(uvm_phase phase);
+		super.report_phase(phase);
+		${2}
+	endfunction: report_phase
+
+snippet final_impl "Impl: final_phase"
+	function void ${1:$TM_FILENAME_BASE}::final_phase(uvm_phase phase);
+		super.final_phase(phase);
+		${2}
+	endfunction: final_phase
+
+# --- Runtime Phases (12 Sub-Phases) ---
+
+# ============================================================================
+# OUT-OF-BODY IMPLEMENTATION (Extern Method Implementation)
+# Usage: Use these AFTER 'endclass' to implement extern methods.
+# Trigger: [phase_name]_impl
+# Note: Automatically fills ClassName based on filename ($TM_FILENAME_BASE).
+# ============================================================================
+
+# --- Common Phases ---
+
+snippet build_impl "Impl: build_phase"
+	function void ${1:$TM_FILENAME_BASE}::build_phase(uvm_phase phase);
+		super.build_phase(phase);
+		${2}
+	endfunction: build_phase
+
+snippet connect_impl "Impl: connect_phase"
+	function void ${1:$TM_FILENAME_BASE}::connect_phase(uvm_phase phase);
+		super.connect_phase(phase);
+		${2}
+	endfunction: connect_phase
+
+snippet end_of_elaboration_impl "Impl: end_of_elaboration_phase"
+	function void ${1:$TM_FILENAME_BASE}::end_of_elaboration_phase(uvm_phase phase);
+		super.end_of_elaboration_phase(phase);
+		${2}
+	endfunction: end_of_elaboration_phase
+
+snippet start_of_simulation_impl "Impl: start_of_simulation_phase"
+	function void ${1:$TM_FILENAME_BASE}::start_of_simulation_phase(uvm_phase phase);
+		super.start_of_simulation_phase(phase);
+		${2}
+	endfunction: start_of_simulation_phase
+
+snippet run_impl "Impl: run_phase"
+	task ${1:$TM_FILENAME_BASE}::run_phase(uvm_phase phase);
+		super.run_phase(phase);
+		${2}
+	endtask: run_phase
+
+snippet extract_impl "Impl: extract_phase"
+	function void ${1:$TM_FILENAME_BASE}::extract_phase(uvm_phase phase);
+		super.extract_phase(phase);
+		${2}
+	endfunction: extract_phase
+
+snippet check_impl "Impl: check_phase"
+	function void ${1:$TM_FILENAME_BASE}::check_phase(uvm_phase phase);
+		super.check_phase(phase);
+		${2}
+	endfunction: check_phase
+
+snippet report_impl "Impl: report_phase"
+	function void ${1:$TM_FILENAME_BASE}::report_phase(uvm_phase phase);
+		super.report_phase(phase);
+		${2}
+	endfunction: report_phase
+
+snippet final_impl "Impl: final_phase"
+	function void ${1:$TM_FILENAME_BASE}::final_phase(uvm_phase phase);
+		super.final_phase(phase);
+		${2}
+	endfunction: final_phase
+
+# --- Runtime Phases (12 Sub-Phases) ---
+
+snippet pre_reset_impl "Impl: pre_reset_phase"
+	task ${1:$TM_FILENAME_BASE}::pre_reset_phase(uvm_phase phase);
+		super.pre_reset_phase(phase);
+		${2}
+	endtask: pre_reset_phase
+
+snippet reset_impl "Impl: reset_phase"
+	task ${1:$TM_FILENAME_BASE}::reset_phase(uvm_phase phase);
+		super.reset_phase(phase);
+		${2}
+	endtask: reset_phase
+
+snippet post_reset_impl "Impl: post_reset_phase"
+	task ${1:$TM_FILENAME_BASE}::post_reset_phase(uvm_phase phase);
+		super.post_reset_phase(phase);
+		${2}
+	endtask: post_reset_phase
+
+snippet pre_configure_impl "Impl: pre_configure_phase"
+	task ${1:$TM_FILENAME_BASE}::pre_configure_phase(uvm_phase phase);
+		super.pre_configure_phase(phase);
+		${2}
+	endtask: pre_configure_phase
+
+snippet configure_impl "Impl:
+
+# ============================================================================
+# OBJECTION UTILITIES
+# ============================================================================
+
+snippet objection "Raise/Drop Objection Block"
+	phase.raise_objection(this);
+	\`uvm_info(get_name(), "Phase started, objection raised", UVM_LOW)
+	
+	${1:// Sequence or Delay}
+	
+	phase.drop_objection(this);
+	\`uvm_info(get_name(), "Phase finished, objection dropped", UVM_LOW)
+
+snippet objection_raise "Raise Objection"
+	phase.raise_objection(this, "${1:Reason}");
+
+snippet objection_drop "Drop Objection"
+	phase.drop_objection(this, "${1:Reason}");
+# ============================================================================
+# UVM CALLBACKS (Hook & Injection)
+# Flow: Define Class -> Register in Driver -> Call in Driver -> Add in Test
+# ============================================================================
+
+# --- STEP 1: Define the Callback Class ---
+snippet uvm_callback_define "Define Callback Class"
+	typedef class ${2:driver_class_name};
+	
+	class ${1:$TM_FILENAME_BASE} extends uvm_callback;
+		\`uvm_object_utils($1)
+		
+		function new(string name = "$1");
+			super.new(name);
+		endfunction
+		
+		// Virtual methods for the driver to call
+		virtual task pre_drive($2 drv, ${3:seq_item_type} item);
+		endtask
+		
+		virtual task post_drive($2 drv, $3 item);
+		endtask
+		
+	endclass : $1
+
+# --- STEP 2: Register & Call (Inside Driver) ---
+# Use this INSIDE your Driver Class
+
+snippet uvm_callback_register "Register Callback (Inside Driver)"
+	// 1. Register the callback type with this component type
+	\`uvm_register_cb(${1:$TM_FILENAME_BASE}, ${2:callback_class_name})
+	
+	// 2. Define typedef for easier usage (Optional but recommended)
+	typedef uvm_callbacks#($1, $2) cb_pool;
+
+snippet uvm_callback_hook "Call Callback (Inside Driver Run Phase)"
+	// Execute the callback hook
+	\`uvm_do_callbacks(${1:driver_class}, ${2:cb_class}, ${3:method_name}(this, req))
+
+# --- STEP 3: Implement & Add (Inside Test/Env) ---
+
+snippet uvm_callback_impl "Implement Specific Callback"
+	class ${1:err_inject}_cb extends ${2:base_cb_class};
+		\`uvm_object_utils($1_cb)
+		
+		function new(string name = "$1_cb");
+			super.new(name);
+		endfunction
+		
+		virtual task ${3:pre_drive}(${4:driver_type} drv, ${5:item_type} item);
+			// Inject Error or Modify Item
+			\`uvm_info("CB", "Injecting Error via Callback", UVM_LOW)
+			${6:item.data = 'hFFFF;}
+		endtask
+	endclass : $1_cb
+
+snippet uvm_callback_add "Add Callback to Instance (In Test)"
+	// Instantiate and register the callback
+	${1:my_cb} = $1::type_id::create("$1");
+	uvm_callbacks#(${2:driver_type}, ${3:cb_base_type})::add(${4:drv_inst}, $1);
+
+# ============================================================================
+# UVM FUNCTIONAL COVERAGE
+# Pattern: uvm_subscriber -> covergroup -> sample()
+# ============================================================================
+
+# --- Complete Coverage Component ---
+
+snippet uvm_cov_subscriber "UVM Coverage Subscriber Component"
+	class ${1:$TM_FILENAME_BASE} extends uvm_subscriber #(${2:transaction_type});
+		\`uvm_component_utils($1)
+		
+		// Transaction handle for sampling
+		$2 ${3:cov_trans};
+		
+		// Covergroup Definition
+		covergroup ${4:cg_trans};
+			option.per_instance = 1;
+			option.comment = "Coverage for $2";
+			
+			${5:cp_field}: coverpoint $3.${6:field_name} {
+				bins ${7:all}[] = {[0:\$]};
+			}
+			// Add cross coverage here
+			// cross $5, other_cp;
+		endgroup : $4
+		
+		function new(string name = "$1", uvm_component parent);
+			super.new(name, parent);
+			$4 = new(); // Instantiate covergroup
+		endfunction
+		
+		// Implementation of the pure virtual function from uvm_subscriber
+		virtual function void write($2 t);
+			// 1. Copy transaction handle
+			$3 = t;
+			// 2. Trigger sampling
+			$4.sample();
+		endfunction
+		
+	endclass : $1
+
+# --- Individual Coverage Methods ---
+
+snippet uvm_cov_write "Write Function (Sampling)"
+	virtual function void write(${1:transaction_type} t);
+		${2:m_trans} = t;
+		${3:cg_inst}.sample();
+	endfunction
+
+snippet uvm_cov_sample "Manual Sample Function"
+	function void sample_coverage(${1:args});
+		${2:local_var} = $1;
+		${3:cg_inst}.sample();
+	endfunction
+
+# --- Covergroup embedded in Class ---
+
+snippet covergroup_class "Class-based Covergroup"
+	covergroup ${1:cg_name} @(posedge ${2:vif.clk});
+		option.per_instance = 1;
+		
+		${3:cp_name}: coverpoint ${4:variable} {
+			bins ${5:low} = {0};
+			bins ${6:high} = {1};
+		}
+	endgroup : $1
+	
+	// Remember to call '$1 = new();' in the class constructor!
+# ============================================================================
+# UVM MONITOR (Data Collector)
+# ============================================================================
+
+snippet uvm_monitor "UVM Monitor Component"
+	class ${1:$TM_FILENAME_BASE} extends uvm_monitor;
+		\`uvm_component_utils($1)
+		
+		// 1. Interface and Analysis Port
+		virtual ${2:my_interface} vif;
+		uvm_analysis_port #(${3:seq_item_type}) ap;
+		
+		function new(string name = "$1", uvm_component parent);
+			super.new(name, parent);
+			ap = new("ap", this);
+		endfunction
+		
+		function void build_phase(uvm_phase phase);
+			super.build_phase(phase);
+			if (!uvm_config_db#(virtual $2)::get(this, "", "vif", vif))
+				\`uvm_fatal("NOVIF", "Virtual interface not set for $1")
+		endfunction
+		
+		task run_phase(uvm_phase phase);
+			$3 item;
+			forever begin
+				// 2. Wait for bus activity and collect data
+				collect_transfer(item);
+				// 3. Broadcast to Scoreboard/Coverage
+				ap.write(item);
+			end
+		endtask
+		
+		task collect_transfer(output $3 item);
+			item = $3::type_id::create("item");
+			@(posedge vif.clk);
+			// TODO: Add protocol specific logic here
+			// item.data = vif.data;
+		endtask
+		
+	endclass : $1
+
+# ============================================================================
+# UVM REFERENCE MODEL / PREDICTOR
+# Receives Input -> Calculates Expected Output -> Sends to Scoreboard
+# ============================================================================
+
+snippet uvm_ref_model "UVM Reference Model (Predictor)"
+	class ${1:$TM_FILENAME_BASE} extends uvm_subscriber #(${2:input_item_type});
+		\`uvm_component_utils($1)
+		
+		// Output Port to Scoreboard
+		uvm_analysis_port #(${3:output_item_type}) ap;
+		
+		function new(string name = "$1", uvm_component parent);
+			super.new(name, parent);
+			ap = new("ap", this);
+		endfunction
+		
+		// 1. Receive Input Transaction
+		virtual function void write($2 t);
+			$3 exp_tr;
+			exp_tr = $3::type_id::create("exp_tr");
+			
+			// 2. Predict Result (Golden Model Logic)
+			predict(t, exp_tr);
+			
+			// 3. Send Expected Transaction to Scoreboard
+			ap.write(exp_tr);
+		endfunction
+		
+		extern function void predict($2 inc, ref $3 out);
+		
+	endclass : $1
+	
+	function void $1::predict($2 inc, ref $3 out);
+		// TODO: Implement reference logic
+		// out.data = inc.addr + inc.data;
+		out.copy(inc); // Default: pass-through
+	endfunction
+
+# ============================================================================
+# UVM SCOREBOARD (Comparator)
+# Uses TLM FIFOs to handle timing differences between DUT and RefModel
+# ============================================================================
+
+snippet uvm_scoreboard "UVM Scoreboard (with TLM FIFOs)"
+	class ${1:$TM_FILENAME_BASE} extends uvm_scoreboard;
+		\`uvm_component_utils($1)
+		
+		// Ports and FIFOs
+		uvm_analysis_export #(${2:seq_item_type}) act_export; // From DUT Monitor
+		uvm_analysis_export #($2) exp_export; // From Ref Model
+		
+		uvm_tlm_analysis_fifo #($2) act_fifo;
+		uvm_tlm_analysis_fifo #($2) exp_fifo;
+		
+		int m_matches, m_mismatches;
+		
+		function new(string name = "$1", uvm_component parent);
+			super.new(name, parent);
+			m_matches = 0;
+			m_mismatches = 0;
+		endfunction
+		
+		function void build_phase(uvm_phase phase);
+			super.build_phase(phase);
+			act_export = new("act_export", this);
+			exp_export = new("exp_export", this);
+			act_fifo   = new("act_fifo", this);
+			exp_fifo   = new("exp_fifo", this);
+		endfunction
+		
+		function void connect_phase(uvm_phase phase);
+			super.connect_phase(phase);
+			// Connect Exports to FIFOs
+			act_export.connect(act_fifo.analysis_export);
+			exp_export.connect(exp_fifo.analysis_export);
+		endfunction
+		
+		task run_phase(uvm_phase phase);
+			$2 act_tr, exp_tr;
+			forever begin
+				// 1. Fetch transactions (Blocking until both available)
+				fork
+					act_fifo.get(act_tr);
+					exp_fifo.get(exp_tr);
+				join
+				
+				// 2. Compare
+				if (act_tr.compare(exp_tr)) begin
+					m_matches++;
+					\`uvm_info("COMPARE", {"MATCH: ", act_tr.convert2string()}, UVM_HIGH)
+				end else begin
+					m_mismatches++;
+					\`uvm_error("COMPARE", $sformatf("MISMATCH!\nExp: %s\nAct: %s", 
+						exp_tr.convert2string(), act_tr.convert2string()))
+				end
+			end
+		endtask
+		
+		function void report_phase(uvm_phase phase);
+			super.report_phase(phase);
+			\`uvm_info("SCB_REPORT", $sformatf("Matches: %0d, Mismatches: %0d", 
+				m_matches, m_mismatches), UVM_LOW)
+		endfunction
+		
+	endclass : $1
+
+# ============================================================================
+# CONNECTION HELPER (Paste inside Env connect_phase)
+# ============================================================================
+
+snippet uvm_connect_scb_ref "Connect Monitor-RefModel-Scoreboard"
+	// 1. Input Monitor -> Ref Model
+	${1:in_agent}.mon.ap.connect(${2:ref_mdl}.analysis_export);
+	
+	// 2. Ref Model (Expected) -> Scoreboard
+	$2.ap.connect(${3:scb}.exp_export);
+	
+	// 3. Output Monitor (Actual) -> Scoreboard
+	${4:out_agent}.mon.ap.connect($3.act_export);
+	
+	
+	
