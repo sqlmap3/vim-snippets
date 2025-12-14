@@ -17,14 +17,16 @@ snippet header "File Header"
 	// Project : ${2:Project Name}
 	// Module  : ${3:$TM_FILENAME_BASE}
 	// Author  : ${4:$USER}
-	// Created : ${5:`strftime("%Y-%m-%d")`}
+        // Created : ${5:$CURRENT_YEAR-$CURRENT_MONTH-$CURRENT_DATE $CURRENT_HOUR:$CURRENT_MINUTE:$CURRENT_SECOND}
+	// Modified: ${6:$CURRENT_YEAR-$CURRENT_MONTH-$CURRENT_DATE $CURRENT_HOUR:$CURRENT_MINUTE:$CURRENT_SECOND}
 	// ===========================================================================
 	// Description:
-	//   ${6:Brief description of the module}
+	//    ${6:Brief description of the module}
 	// ===========================================================================
 	
 	${0}
-
+snippet mod "Modification Log Entry"
+	// ${1:$CURRENT_YEAR-$CURRENT_MONTH-$CURRENT_DATE} : ${2:Your Name} - ${3:Description of change}
 # ============================================================================
 # HEADER GUARD
 # Auto-converts filename to UPPERCASE (e.g. my_agent -> MY_AGENT)
@@ -3016,168 +3018,881 @@ snippet covergroup_class "Class-based Covergroup"
 	endgroup : $1
 	
 	// Remember to call '$1 = new();' in the class constructor!
-# ============================================================================
-# UVM MONITOR (Data Collector)
-# ============================================================================
 
-snippet uvm_monitor "UVM Monitor Component"
+
+
+# ==============================================================================
+# UVM OBJECTS (Transactions & Sequences) - Extern Style
+# ==============================================================================
+
+snippet uvm_object_extern "UVM Object (Extern)"
+	class ${1:$TM_FILENAME_BASE} extends uvm_object;
+		\`uvm_object_utils($1)
+
+		extern function new(string name = "$1");
+	endclass : $1
+
+	function $1::new(string name = "$1");
+		super.new(name);
+	endfunction : new
+
+snippet uvm_seq_item_extern "UVM Sequence Item (Extern)"
+	class ${1:$TM_FILENAME_BASE} extends uvm_sequence_item;
+		\`uvm_object_utils($1)
+
+		// rand bit [7:0] data;
+
+		extern function new(string name = "$1");
+	endclass : $1
+
+	function $1::new(string name = "$1");
+		super.new(name);
+	endfunction : new
+
+snippet uvm_sequence_extern "UVM Sequence (Extern)"
+	class ${1:$TM_FILENAME_BASE} extends uvm_sequence;
+		\`uvm_object_utils($1)
+
+		extern function new(string name = "$1");
+		extern task body();
+	endclass : $1
+
+	function $1::new(string name = "$1");
+		super.new(name);
+	endfunction : new
+
+	task $1::body();
+		// `uvm_do(req)
+	endtask : body
+
+# ==============================================================================
+# UVM COMPONENTS - Extern Style
+# ==============================================================================
+
+snippet uvm_component_extern "UVM Generic Component (Extern)"
+	class ${1:$TM_FILENAME_BASE} extends uvm_component;
+		\`uvm_component_utils($1)
+
+		extern function new(string name = "$1", uvm_component parent);
+		extern function void build_phase(uvm_phase phase);
+		extern function void connect_phase(uvm_phase phase);
+		extern task run_phase(uvm_phase phase);
+	endclass : $1
+
+	function $1::new(string name = "$1", uvm_component parent);
+		super.new(name, parent);
+	endfunction : new
+
+	function void $1::build_phase(uvm_phase phase);
+		super.build_phase(phase);
+	endfunction : build_phase
+
+	function void $1::connect_phase(uvm_phase phase);
+		super.connect_phase(phase);
+	endfunction : connect_phase
+
+	task $1::run_phase(uvm_phase phase);
+		super.run_phase(phase);
+	endtask : run_phase
+
+snippet uvm_sequencer_extern "UVM Sequencer (Extern)"
+	class ${1:$TM_FILENAME_BASE} extends uvm_sequencer #(${2:my_transaction});
+		\`uvm_component_utils($1)
+
+		extern function new(string name = "$1", uvm_component parent);
+	endclass : $1
+
+	function $1::new(string name = "$1", uvm_component parent);
+		super.new(name, parent);
+	endfunction : new
+
+snippet uvm_driver_extern "UVM Driver (Extern)"
+	class ${1:$TM_FILENAME_BASE} extends uvm_driver #(${2:my_transaction});
+		\`uvm_component_utils($1)
+
+		virtual ${3:my_interface} vif;
+
+		extern function new(string name = "$1", uvm_component parent);
+		extern function void build_phase(uvm_phase phase);
+		extern task run_phase(uvm_phase phase);
+	endclass : $1
+
+	function $1::new(string name = "$1", uvm_component parent);
+		super.new(name, parent);
+	endfunction : new
+
+	function void $1::build_phase(uvm_phase phase);
+		super.build_phase(phase);
+		if(!uvm_config_db#(virtual $3)::get(this, "", "vif", vif))
+			\`uvm_fatal("$1", "Could not get vif")
+	endfunction : build_phase
+
+	task $1::run_phase(uvm_phase phase);
+		super.run_phase(phase);
+		forever begin
+			seq_item_port.get_next_item(req);
+			// drive_item(req);
+			seq_item_port.item_done();
+		end
+	endtask : run_phase
+
+snippet uvm_monitor_extern "UVM Monitor (Extern)"
 	class ${1:$TM_FILENAME_BASE} extends uvm_monitor;
 		\`uvm_component_utils($1)
-		
-		// 1. Interface and Analysis Port
+
 		virtual ${2:my_interface} vif;
-		uvm_analysis_port #(${3:seq_item_type}) ap;
-		
-		function new(string name = "$1", uvm_component parent);
-			super.new(name, parent);
-			ap = new("ap", this);
-		endfunction
-		
-		function void build_phase(uvm_phase phase);
-			super.build_phase(phase);
-			if (!uvm_config_db#(virtual $2)::get(this, "", "vif", vif))
-				\`uvm_fatal("NOVIF", "Virtual interface not set for $1")
-		endfunction
-		
-		task run_phase(uvm_phase phase);
-			$3 item;
-			forever begin
-				// 2. Wait for bus activity and collect data
-				collect_transfer(item);
-				// 3. Broadcast to Scoreboard/Coverage
-				ap.write(item);
-			end
-		endtask
-		
-		task collect_transfer(output $3 item);
-			item = $3::type_id::create("item");
-			@(posedge vif.clk);
-			// TODO: Add protocol specific logic here
-			// item.data = vif.data;
-		endtask
-		
+		uvm_analysis_port #(${3:my_transaction}) ap;
+
+		extern function new(string name = "$1", uvm_component parent);
+		extern function void build_phase(uvm_phase phase);
+		extern task run_phase(uvm_phase phase);
 	endclass : $1
 
-# ============================================================================
-# UVM REFERENCE MODEL / PREDICTOR
-# Receives Input -> Calculates Expected Output -> Sends to Scoreboard
-# ============================================================================
+	function $1::new(string name = "$1", uvm_component parent);
+		super.new(name, parent);
+		ap = new("ap", this);
+	endfunction : new
 
-snippet uvm_ref_model "UVM Reference Model (Predictor)"
-	class ${1:$TM_FILENAME_BASE} extends uvm_subscriber #(${2:input_item_type});
+	function void $1::build_phase(uvm_phase phase);
+		super.build_phase(phase);
+		if(!uvm_config_db#(virtual $2)::get(this, "", "vif", vif))
+			\`uvm_fatal("$1", "Could not get vif")
+	endfunction : build_phase
+
+	task $1::run_phase(uvm_phase phase);
+		super.run_phase(phase);
+	endtask : run_phase
+
+snippet uvm_agent_extern "UVM Agent (Extern)"
+	class ${1:$TM_FILENAME_BASE} extends uvm_agent;
 		\`uvm_component_utils($1)
-		
-		// Output Port to Scoreboard
-		uvm_analysis_port #(${3:output_item_type}) ap;
-		
-		function new(string name = "$1", uvm_component parent);
-			super.new(name, parent);
-			ap = new("ap", this);
-		endfunction
-		
-		// 1. Receive Input Transaction
-		virtual function void write($2 t);
-			$3 exp_tr;
-			exp_tr = $3::type_id::create("exp_tr");
-			
-			// 2. Predict Result (Golden Model Logic)
-			predict(t, exp_tr);
-			
-			// 3. Send Expected Transaction to Scoreboard
-			ap.write(exp_tr);
-		endfunction
-		
-		extern function void predict($2 inc, ref $3 out);
-		
+
+		${2:my_sequencer} m_sequencer;
+		${3:my_driver}    m_driver;
+		${4:my_monitor}   m_monitor;
+
+		extern function new(string name = "$1", uvm_component parent);
+		extern function void build_phase(uvm_phase phase);
+		extern function void connect_phase(uvm_phase phase);
 	endclass : $1
-	
-	function void $1::predict($2 inc, ref $3 out);
-		// TODO: Implement reference logic
-		// out.data = inc.addr + inc.data;
-		out.copy(inc); // Default: pass-through
-	endfunction
 
-# ============================================================================
-# UVM SCOREBOARD (Comparator)
-# Uses TLM FIFOs to handle timing differences between DUT and RefModel
-# ============================================================================
+	function $1::new(string name = "$1", uvm_component parent);
+		super.new(name, parent);
+	endfunction : new
 
-snippet uvm_scoreboard "UVM Scoreboard (with TLM FIFOs)"
+	function void $1::build_phase(uvm_phase phase);
+		super.build_phase(phase);
+		m_monitor = $4::type_id::create("m_monitor", this);
+		if(get_is_active() == UVM_ACTIVE) begin
+			m_driver    = $3::type_id::create("m_driver", this);
+			m_sequencer = $2::type_id::create("m_sequencer", this);
+		end
+	endfunction : build_phase
+
+	function void $1::connect_phase(uvm_phase phase);
+		super.connect_phase(phase);
+		if(get_is_active() == UVM_ACTIVE) begin
+			m_driver.seq_item_port.connect(m_sequencer.seq_item_export);
+		end
+	endfunction : connect_phase
+
+snippet uvm_scoreboard_extern "UVM Scoreboard (Extern)"
 	class ${1:$TM_FILENAME_BASE} extends uvm_scoreboard;
 		\`uvm_component_utils($1)
-		
-		// Ports and FIFOs
-		uvm_analysis_export #(${2:seq_item_type}) act_export; // From DUT Monitor
-		uvm_analysis_export #($2) exp_export; // From Ref Model
-		
-		uvm_tlm_analysis_fifo #($2) act_fifo;
-		uvm_tlm_analysis_fifo #($2) exp_fifo;
-		
-		int m_matches, m_mismatches;
-		
-		function new(string name = "$1", uvm_component parent);
-			super.new(name, parent);
-			m_matches = 0;
-			m_mismatches = 0;
-		endfunction
-		
-		function void build_phase(uvm_phase phase);
-			super.build_phase(phase);
-			act_export = new("act_export", this);
-			exp_export = new("exp_export", this);
-			act_fifo   = new("act_fifo", this);
-			exp_fifo   = new("exp_fifo", this);
-		endfunction
-		
-		function void connect_phase(uvm_phase phase);
-			super.connect_phase(phase);
-			// Connect Exports to FIFOs
-			act_export.connect(act_fifo.analysis_export);
-			exp_export.connect(exp_fifo.analysis_export);
-		endfunction
-		
-		task run_phase(uvm_phase phase);
-			$2 act_tr, exp_tr;
-			forever begin
-				// 1. Fetch transactions (Blocking until both available)
-				fork
-					act_fifo.get(act_tr);
-					exp_fifo.get(exp_tr);
-				join
-				
-				// 2. Compare
-				if (act_tr.compare(exp_tr)) begin
-					m_matches++;
-					\`uvm_info("COMPARE", {"MATCH: ", act_tr.convert2string()}, UVM_HIGH)
-				end else begin
-					m_mismatches++;
-					\`uvm_error("COMPARE", $sformatf("MISMATCH!\nExp: %s\nAct: %s", 
-						exp_tr.convert2string(), act_tr.convert2string()))
-				end
-			end
-		endtask
-		
-		function void report_phase(uvm_phase phase);
-			super.report_phase(phase);
-			\`uvm_info("SCB_REPORT", $sformatf("Matches: %0d, Mismatches: %0d", 
-				m_matches, m_mismatches), UVM_LOW)
-		endfunction
-		
+
+		uvm_analysis_imp #(${2:my_transaction}, $1) analysis_imp;
+
+		extern function new(string name = "$1", uvm_component parent);
+		extern function void write($2 tr);
 	endclass : $1
 
-# ============================================================================
-# CONNECTION HELPER (Paste inside Env connect_phase)
-# ============================================================================
+	function $1::new(string name = "$1", uvm_component parent);
+		super.new(name, parent);
+		analysis_imp = new("analysis_imp", this);
+	endfunction : new
 
-snippet uvm_connect_scb_ref "Connect Monitor-RefModel-Scoreboard"
-	// 1. Input Monitor -> Ref Model
-	${1:in_agent}.mon.ap.connect(${2:ref_mdl}.analysis_export);
+	function void $1::write($2 tr);
+	endfunction : write
+
+snippet uvm_env_extern "UVM Env (Extern)"
+	class ${1:$TM_FILENAME_BASE} extends uvm_env;
+		\`uvm_component_utils($1)
+
+		${2:my_agent} m_agent;
+		${3:my_scoreboard} m_sb;
+
+		extern function new(string name = "$1", uvm_component parent);
+		extern function void build_phase(uvm_phase phase);
+		extern function void connect_phase(uvm_phase phase);
+	endclass : $1
+
+	function $1::new(string name = "$1", uvm_component parent);
+		super.new(name, parent);
+	endfunction : new
+
+	function void $1::build_phase(uvm_phase phase);
+		super.build_phase(phase);
+		m_agent = $2::type_id::create("m_agent", this);
+		m_sb    = $3::type_id::create("m_sb", this);
+	endfunction : build_phase
+
+	function void $1::connect_phase(uvm_phase phase);
+		super.connect_phase(phase);
+		m_agent.ap.connect(m_sb.analysis_imp);
+	endfunction : connect_phase
+
+snippet uvm_test_extern "UVM Test (Extern)"
+	class ${1:$TM_FILENAME_BASE} extends uvm_test;
+		\`uvm_component_utils($1)
+
+		${2:my_env} m_env;
+
+		extern function new(string name = "$1", uvm_component parent);
+		extern function void build_phase(uvm_phase phase);
+		extern task run_phase(uvm_phase phase);
+	endclass : $1
+
+	function $1::new(string name = "$1", uvm_component parent);
+		super.new(name, parent);
+	endfunction : new
+
+	function void $1::build_phase(uvm_phase phase);
+		super.build_phase(phase);
+		m_env = $2::type_id::create("m_env", this);
+	endfunction : build_phase
+
+	task $1::run_phase(uvm_phase phase);
+		super.run_phase(phase);
+		phase.raise_objection(this);
+		// start sequences
+		phase.drop_objection(this);
+	endtask : run_phase
+
+
+snippet uvm_subscriber_extern "UVM Subscriber (Extern)"
+	class ${1:$TM_FILENAME_BASE} extends uvm_subscriber #(${2:my_transaction});
+		\`uvm_component_utils($1)
+
+		extern function new(string name = "$1", uvm_component parent);
+		extern function void write($2 t);
+	endclass : $1
+
+	function $1::new(string name = "$1", uvm_component parent);
+		super.new(name, parent);
+	endfunction : new
+
+	function void $1::write($2 t);
+		// covergroup.sample();
+	endfunction : write
+
+
+snippet uvm_reg_extern "UVM Register (Extern)"
+	class ${1:$TM_FILENAME_BASE} extends uvm_reg;
+		\`uvm_object_utils($1)
+
+		rand uvm_reg_field data;
+
+		extern function new(string name = "$1");
+		extern virtual function void build();
+	endclass : $1
+
+	function $1::new(string name = "$1");
+		super.new(name, 32, UVM_NO_COVERAGE);
+	endfunction : new
+
+	function void $1::build();
+		data = uvm_reg_field::type_id::create("data");
+		data.configure(this, 32, 0, "RW", 0, 0, 1, 1, 0);
+	endfunction : build
+
+snippet uvm_reg_block_extern "UVM Register Block (Extern)"
+	class ${1:$TM_FILENAME_BASE} extends uvm_reg_block;
+		\`uvm_object_utils($1)
+
+		rand ${2:my_reg} reg_inst;
+
+		extern function new(string name = "$1");
+		extern virtual function void build();
+	endclass : $1
+
+	function $1::new(string name = "$1");
+		super.new(name, UVM_NO_COVERAGE);
+	endfunction : new
+
+	function void $1::build();
+		reg_inst = $2::type_id::create("reg_inst");
+		reg_inst.configure(this);
+		reg_inst.build();
+
+		default_map = create_map("default_map", 'h0, 4, UVM_LITTLE_ENDIAN);
+		default_map.add_reg(reg_inst, 'h0, "RW");
+		lock_model();
+	endfunction : build
+
+snippet uvm_reg_adapter_extern "UVM Register Adapter (Extern)"
+	class ${1:$TM_FILENAME_BASE} extends uvm_reg_adapter;
+		\`uvm_object_utils($1)
+
+		extern function new(string name = "$1");
+		extern virtual function uvm_sequence_item reg2bus(const ref uvm_reg_bus_op rw);
+		extern virtual function void bus2reg(uvm_sequence_item bus_item, ref uvm_reg_bus_op rw);
+	endclass : $1
+
+	function $1::new(string name = "$1");
+		super.new(name);
+		supports_byte_enable = 0;
+		provides_responses = 0;
+	endfunction : new
+
+	function uvm_sequence_item $1::reg2bus(const ref uvm_reg_bus_op rw);
+		${2:my_transaction} tr = $2::type_id::create("tr");
+		tr.addr = rw.addr;
+		tr.data = rw.data;
+		tr.kind = (rw.kind == UVM_READ) ? $2::READ : $2::WRITE;
+		return tr;
+	endfunction : reg2bus
+
+	function void $1::bus2reg(uvm_sequence_item bus_item, ref uvm_reg_bus_op rw);
+		${2:my_transaction} tr;
+		if (!\$cast(tr, bus_item)) begin
+			\`uvm_fatal("NOT_BUS_TYPE", "Provided bus_item is not of the correct type")
+			return;
+		end
+		rw.kind = (tr.kind == $2::READ) ? UVM_READ : UVM_WRITE;
+		rw.addr = tr.addr;
+		rw.data = tr.data;
+		rw.status = UVM_IS_OK;
+	endfunction : bus2reg
+
+
+
+
+snippet uvm_conf_set "UVM Config DB Set"
+	uvm_config_db#(${1:int})::set(this, "${2:*}", "${3:name}", ${4:value});
+
+snippet uvm_conf_get "UVM Config DB Get"
+	if(!uvm_config_db#(${1:virtual my_if})::get(this, "", "${2:vif}", ${3:vif}))
+		\`uvm_fatal(get_type_name(), "Could not get $3")
+
+
+snippet uinfo "UVM Info"
+	\`uvm_info(get_type_name(), "${1:Message}", UVM_LOW)
+
+snippet uerror "UVM Error"
+	\`uvm_error(get_type_name(), "${1:Error Message}")
+
+snippet ufatal "UVM Fatal"
+	\`uvm_fatal(get_type_name(), "${1:Fatal Error}")
+
+
+snippet sv_interface "SystemVerilog Interface"
+	interface ${1:$TM_FILENAME_BASE} (input logic clk, input logic rst_n);
+		logic [31:0] data;
+		logic        valid;
+
+		clocking cb @(posedge clk);
+			default input #1step output #1ns;
+			input  data;
+			input  valid;
+		endclocking
+
+		modport DRIVER (clocking cb, output rst_n);
+		modport MONITOR (clocking cb);
+	endinterface : $1
+
+
+
+snippet tb_top "UVM Testbench Top Module"
+	\`timescale 1ns/1ps
+	\`include "uvm_macros.svh"
+	import uvm_pkg::*;
+
+	module ${1:$TM_FILENAME_BASE};
+
+		bit clk;
+		bit rst_n;
+
+		// Clock Generation
+		initial begin
+			clk = 0;
+			forever #5 clk = ~clk;
+		end
+
+		// Reset Generation
+		initial begin
+			rst_n = 0;
+			#100 rst_n = 1;
+		end
+
+		// Interface Instantiation
+		${2:my_interface} vif(clk, rst_n);
+
+		// DUT Instantiation
+		${3:my_dut} dut (
+			.clk(vif.clk),
+			.rst_n(vif.rst_n),
+			.data(vif.data),
+			.valid(vif.valid)
+		);
+
+		initial begin
+			// Pass interface to UVM config db
+			uvm_config_db#(virtual $2)::set(null, "*", "vif", vif);
+			// Start the test
+			run_test();
+		end
+
+		initial begin
+			$fsdbDumpfile("tb.fsdb");
+			$fsdbDumpvars(0, $1);
+		end
+
+	endmodule : $1
+
+
+snippet uvm_virtual_seq_extern "UVM Virtual Sequence (Extern)"
+	class ${1:$TM_FILENAME_BASE} extends uvm_sequence;
+		\`uvm_object_utils($1)
+		\`uvm_declare_p_sequencer(${2:my_virtual_sequencer})
+
+		extern function new(string name = "$1");
+		extern task body();
+	endclass : $1
+
+	function $1::new(string name = "$1");
+		super.new(name);
+	endfunction : new
+
+	task $1::body();
+		// Example: Forking sequences on different sub-sequencers
+		// fork
+		//    \`uvm_do_on(seq_a, p_sequencer.agent_a_sqr)
+		//    \`uvm_do_on(seq_b, p_sequencer.agent_b_sqr)
+		// join
+	endtask : body
+
 	
-	// 2. Ref Model (Expected) -> Scoreboard
-	$2.ap.connect(${3:scb}.exp_export);
-	
-	// 3. Output Monitor (Actual) -> Scoreboard
-	${4:out_agent}.mon.ap.connect($3.act_export);
-	
-	
-	
+
+snippet uvm_virtual_sqr_extern "UVM Virtual Sequencer (Extern)"
+	class ${1:$TM_FILENAME_BASE} extends uvm_sequencer;
+		\`uvm_component_utils($1)
+
+		// Handles to physical sequencers
+		${2:my_agent_sequencer} sqr_a;
+		${3:my_agent_sequencer} sqr_b;
+
+		extern function new(string name = "$1", uvm_component parent);
+	endclass : $1
+
+	function $1::new(string name = "$1", uvm_component parent);
+		super.new(name, parent);
+	endfunction : new
+
+
+snippet uvm_seq_lib_extern "UVM Sequence Library (Extern)"
+	class ${1:$TM_FILENAME_BASE} extends uvm_sequence_library #(${2:my_transaction});
+		\`uvm_object_utils($1)
+		\`uvm_sequence_library_utils($1)
+
+		extern function new(string name = "$1");
+	endclass : $1
+
+	function $1::new(string name = "$1");
+		super.new(name);
+		init_sequence_library();
+	endfunction : new
+
+
+snippet uvm_seq_manual_extern "UVM Sequence Manual Body (Extern)"
+	class ${1:$TM_FILENAME_BASE} extends uvm_sequence #(${2:my_transaction});
+		\`uvm_object_utils($1)
+
+		extern function new(string name = "$1");
+		extern task body();
+	endclass : $1
+
+	function $1::new(string name = "$1");
+		super.new(name);
+	endfunction : new
+
+	task $1::body();
+		req = $2::type_id::create("req");
+		start_item(req);
+		if (!req.randomize()) begin
+			\`uvm_error("RNDFAIL", "Randomization failed")
+		end
+		finish_item(req);
+	endtask : body
+
+
+snippet uvm_ref_model_extern "UVM Reference Model (Extern)"
+	class ${1:$TM_FILENAME_BASE} extends uvm_component;
+		\`uvm_component_utils($1)
+
+		// Input from Agent A (Input Monitor)
+		uvm_analysis_imp #(${2:input_trans}, $1) analysis_imp;
+		
+		// Output to Scoreboard
+		uvm_analysis_port #(${3:output_trans}) ap;
+
+		extern function new(string name = "$1", uvm_component parent);
+		extern function void build_phase(uvm_phase phase);
+		extern function void write($2 tr); // Implementation of analysis_imp
+		extern function void predict($2 tr);
+	endclass : $1
+
+	function $1::new(string name = "$1", uvm_component parent);
+		super.new(name, parent);
+		analysis_imp = new("analysis_imp", this);
+		ap = new("ap", this);
+	endfunction : new
+
+	function void $1::build_phase(uvm_phase phase);
+		super.build_phase(phase);
+	endfunction : build_phase
+
+	// Triggered when Input Monitor writes a transaction
+	function void $1::write($2 tr);
+		predict(tr);
+	endfunction : write
+
+	function void $1::predict($2 tr);
+		$3 exp_tr;
+		exp_tr = $3::type_id::create("exp_tr");
+		
+		// ---------------------------------------
+		// TODO: Add Golden Reference Logic Here
+		// exp_tr.data = tr.data + 1; 
+		// ---------------------------------------
+		
+		ap.write(exp_tr); // Send expected result to SCB
+	endfunction : predict
+
+
+
+snippet uvm_scb_compare_extern "UVM Scoreboard with Comparator (Extern)"
+	class ${1:$TM_FILENAME_BASE} extends uvm_scoreboard;
+		\`uvm_component_utils($1)
+
+		// Port for Expected Transactions (from Reference Model)
+		uvm_analysis_export #(${2:my_transaction}) exp_export;
+		uvm_tlm_analysis_fifo #($2) exp_fifo;
+
+		// Port for Actual Transactions (from Output Monitor)
+		uvm_analysis_export #($2) act_export;
+		uvm_tlm_analysis_fifo #($2) act_fifo;
+
+		int m_matches, m_mismatches;
+
+		extern function new(string name = "$1", uvm_component parent);
+		extern function void build_phase(uvm_phase phase);
+		extern function void connect_phase(uvm_phase phase);
+		extern task run_phase(uvm_phase phase);
+		extern function void report_phase(uvm_phase phase);
+	endclass : $1
+
+	function $1::new(string name = "$1", uvm_component parent);
+		super.new(name, parent);
+		m_matches = 0;
+		m_mismatches = 0;
+	endfunction : new
+
+	function void $1::build_phase(uvm_phase phase);
+		super.build_phase(phase);
+		exp_fifo = new("exp_fifo", this);
+		act_fifo = new("act_fifo", this);
+		exp_export = new("exp_export", this);
+		act_export = new("act_export", this);
+	endfunction : build_phase
+
+	function void $1::connect_phase(uvm_phase phase);
+		super.connect_phase(phase);
+		exp_export.connect(exp_fifo.analysis_export);
+		act_export.connect(act_fifo.analysis_export);
+	endfunction : connect_phase
+
+	task $1::run_phase(uvm_phase phase);
+		$2 exp_tr, act_tr;
+		super.run_phase(phase);
+		forever begin
+			// Fetch transactions from both FIFOs
+			exp_fifo.get(exp_tr);
+			act_fifo.get(act_tr);
+
+			if (exp_tr.compare(act_tr)) begin
+				\`uvm_info("SCB_MATCH", $sformatf("Match: %s", act_tr.convert2string()), UVM_LOW)
+				m_matches++;
+			end else begin
+				\`uvm_error("SCB_MISMATCH", $sformatf("Mismatch!\\nExp: %s\\nAct: %s", exp_tr.convert2string(), act_tr.convert2string()))
+				m_mismatches++;
+			end
+		end
+	endtask : run_phase
+
+	function void $1::report_phase(uvm_phase phase);
+		super.report_phase(phase);
+		\`uvm_info("SCB_SUMMARY", $sformatf("Simulation Finished. Matches: %0d, Mismatches: %0d", m_matches, m_mismatches), UVM_LOW)
+	endfunction : report_phase
+
+
+
+
+snippet uvm_analysis_export "UVM Analysis Export Declaration"
+	uvm_analysis_export #(${1:my_transaction}) ${2:an_export};
+	// Remember to add in build_phase:
+	// $2 = new("$2", this);
+
+
+
+
+snippet uvm_analysis_imp "UVM Analysis Imp Declaration"
+	uvm_analysis_imp #(${1:my_transaction}, ${2:$TM_FILENAME_BASE}) ${3:analysis_imp};
+
+	extern function void write($1 t);
+
+
+
+snippet uvm_port_new "UVM Port Instantiation"
+	${1:port_name} = new("$1", this);
+
+
+snippet uvm_write_extern "UVM Write Function Implementation"
+	function void ${1:$TM_FILENAME_BASE}::write(${2:my_transaction} t);
+		// Logic here
+		// \$display("Received: %s", t.convert2string());
+	endfunction : write
+
+
+
+snippet uvm_config_set "UVM Config DB Set (General)"
+	uvm_config_db#(${1:int})::set(${2:this}, "${3:*}", "${4:field_name}", ${5:value});
+
+snippet uvm_config_get "UVM Config DB Get (General)"
+	if(!uvm_config_db#(${1:int})::get(${2:this}, "${3:}", "${4:field_name}", ${5:variable})) begin
+		\`uvm_fatal(get_type_name(), "Could not get $4 from config DB")
+	end	
+snippet uvm_config_vif_set "UVM Config DB Set Virtual Interface"
+	uvm_config_db#(virtual ${1:my_interface})::set(uvm_root::get(), "*", "${2:vif}", ${3:vif_instance});
+
+snippet uvm_config_vif_get "UVM Config DB Get Virtual Interface"
+	if(!uvm_config_db#(virtual ${1:my_interface})::get(this, "", "${2:vif}", ${3:vif})) begin
+		\`uvm_fatal(get_type_name(), "Could not get virtual interface '$2'")
+	end
+
+
+
+snippet uvm_config_wait "UVM Config DB Wait Modified"
+	uvm_config_db#(${1:int})::wait_modified(this, "", "${2:field_name}");
+
+
+snippet uvm_drain_time "UVM Set Drain Time"
+	phase.phase_done.set_drain_time(this, ${1:100}ns);
+
+
+
+snippet uvm_ready_to_end_extern "UVM Phase Ready to End (Extern)"
+	extern virtual function void phase_ready_to_end(uvm_phase phase);
+
+	function void ${1:$TM_FILENAME_BASE}::phase_ready_to_end(uvm_phase phase);
+		super.phase_ready_to_end(phase);
+		if (phase.get_name() == "run") begin
+			if (!${2:is_empty()}) begin
+				phase.raise_objection(this, "Scoreboard not empty");
+				fork
+					begin
+						// Wait for scoreboard to drain
+						wait(${2:is_empty()});
+						phase.drop_objection(this, "Scoreboard empty");
+					end
+				join_none
+			end
+		end
+	endfunction : phase_ready_to_end
+
+
+
+snippet uvm_timeout "UVM Set Global Timeout"
+	uvm_top.set_timeout(${1:1ms}, 0);
+
+
+
+snippet uvm_utils_begin "UVM Object Utils Begin/End"
+	\`uvm_object_utils_begin(${1:$TM_FILENAME_BASE})
+		$2
+	\`uvm_object_utils_end
+snippet uvm_field_int "UVM Field Int"
+	\`uvm_field_int(${1:variable_name}, ${2:UVM_ALL_ON})
+
+snippet uvm_field_enum "UVM Field Enum"
+	\`uvm_field_enum(${1:enum_type}, ${2:variable_name}, ${3:UVM_ALL_ON})
+
+snippet uvm_field_string "UVM Field String"
+	\`uvm_field_string(${1:variable_name}, ${2:UVM_ALL_ON})
+
+snippet uvm_field_real "UVM Field Real"
+	\`uvm_field_real(${1:variable_name}, ${2:UVM_ALL_ON})
+
+snippet uvm_field_event "UVM Field Event"
+	\`uvm_field_event(${1:variable_name}, ${2:UVM_ALL_ON})
+
+
+
+snippet uvm_field_object "UVM Field Object"
+	\`uvm_field_object(${1:object_handle}, ${2:UVM_ALL_ON})
+
+
+
+snippet uvm_field_array_int "UVM Field Array Int"
+	\`uvm_field_array_int(${1:variable_name}, ${2:UVM_ALL_ON})
+
+snippet uvm_field_array_enum "UVM Field Array Enum"
+	\`uvm_field_array_enum(${1:enum_type}, ${2:variable_name}, ${3:UVM_ALL_ON})
+
+snippet uvm_field_array_string "UVM Field Array String"
+	\`uvm_field_array_string(${1:variable_name}, ${2:UVM_ALL_ON})
+
+snippet uvm_field_array_object "UVM Field Array Object"
+	\`uvm_field_array_object(${1:variable_name}, ${2:UVM_ALL_ON})
+
+
+snippet uvm_field_sarray_int "UVM Field Static Array Int"
+	\`uvm_field_sarray_int(${1:variable_name}, ${2:UVM_ALL_ON})
+
+snippet uvm_field_sarray_enum "UVM Field Static Array Enum"
+	\`uvm_field_sarray_enum(${1:enum_type}, ${2:variable_name}, ${3:UVM_ALL_ON})
+
+
+
+snippet uvm_field_aa_int_string "UVM Field AA Int [String]"
+	\`uvm_field_aa_int_string(${1:variable_name}, ${2:UVM_ALL_ON})
+
+snippet uvm_field_aa_string_string "UVM Field AA String [String]"
+	\`uvm_field_aa_string_string(${1:variable_name}, ${2:UVM_ALL_ON})
+
+snippet uvm_field_aa_object_string "UVM Field AA Object [String]"
+	\`uvm_field_aa_object_string(${1:variable_name}, ${2:UVM_ALL_ON})
+
+
+snippet uvm_sequencer_typedef "UVM Sequencer Typedef"
+	typedef uvm_sequencer #(${1:my_seq_item}) ${2:my_sequencer};
+
+
+snippet uvm_seq_objection_body_extern "UVM Sequence Objections in Body (Extern)"
+	class ${1:$TM_FILENAME_BASE} extends uvm_sequence #(${2:my_seq_item});
+		\`uvm_object_utils($1)
+
+		rand int num_items;
+		constraint c_num_items { num_items inside {[1:20]}; }
+
+		extern function new(string name = "$1");
+		extern task body();
+	endclass : $1
+
+	function $1::new(string name = "$1");
+		super.new(name);
+		num_items = 5;
+	endfunction : new
+
+	task $1::body();
+		uvm_phase starting_phase = get_starting_phase(); // UVM 1.2
+		$2 req;
+
+		if (starting_phase != null)
+			starting_phase.raise_objection(this);
+
+		repeat (num_items) begin
+			\`uvm_do(req)
+		end
+
+		if (starting_phase != null)
+			starting_phase.drop_objection(this);
+	endtask : body
+
+
+
+
+snippet uvm_seq_nested_extern "UVM Nested/Virtual Sequence (Extern)"
+	class ${1:$TM_FILENAME_BASE} extends uvm_sequence #(${2:my_seq_item});
+		\`uvm_object_utils($1)
+		\`uvm_declare_p_sequencer(${3:my_virtual_sequencer})
+
+		${4:my_write_seq} write_seq;
+		${5:my_read_seq}  read_seq;
+
+		extern function new(string name = "$1");
+		extern task body();
+	endclass : $1
+
+	function $1::new(string name = "$1");
+		super.new(name);
+	endfunction : new
+
+	task $1::body();
+		// Execute write sequence on write_sqr
+		repeat(5) begin
+			\`uvm_do_on_with(write_seq, p_sequencer.${6:m_write_sqr}, { addr < 100; })
+		end
+
+		// Execute read sequence on read_sqr
+		\`uvm_do_on(read_seq, p_sequencer.${7:m_read_sqr})
+	endtask : body
+
+
+
+snippet uvm_seq_manual_full_extern "UVM Sequence Manual Item (Extern)"
+	class ${1:$TM_FILENAME_BASE} extends uvm_sequence #(${2:my_seq_item});
+		\`uvm_object_utils($1)
+
+		extern function new(string name = "$1");
+		extern task body();
+	endclass : $1
+
+	function $1::new(string name = "$1");
+		super.new(name);
+	endfunction : new
+
+	task $1::body();
+		$2 req;
+
+		// 1. Create and Start
+		req = $2::type_id::create("req");
+		start_item(req);
+
+		// 2. Late Randomization
+		if (!req.randomize() with { addr < 'hffff; }) begin
+			\`uvm_error("RNDFAIL", "Randomization failed")
+		end
+
+		// 3. Finish (Send to driver)
+		finish_item(req);
+	endtask : body
+
+
+
+snippet uvm_seq_manual_full_extern "UVM Sequence Manual Item (Extern)"
+	class ${1:$TM_FILENAME_BASE} extends uvm_sequence #(${2:my_seq_item});
+		\`uvm_object_utils($1)
+
+		extern function new(string name = "$1");
+		extern task body();
+	endclass : $1
+
+	function $1::new(string name = "$1");
+		super.new(name);
+	endfunction : new
+
+	task $1::body();
+		$2 req;
+
+		// 1. Create and Start
+		req = $2::type_id::create("req");
+		start_item(req);
+
+		// 2. Late Randomization
+		if (!req.randomize() with { addr < 'hffff; }) begin
+			\`uvm_error("RNDFAIL", "Randomization failed")
+		end
+
+		// 3. Finish (Send to driver)
+		finish_item(req);
+	endtask : body
