@@ -16,7 +16,7 @@ snippet header "File Header"
 	// File    : ${1:$TM_FILENAME}
 	// Project : ${2:Project Name}
 	// Module  : ${3:$TM_FILENAME_BASE}
-	// Author  : ${4:$USER}
+	// Author  : ${4:$user}
         // Created : ${5:$CURRENT_YEAR-$CURRENT_MONTH-$CURRENT_DATE $CURRENT_HOUR:$CURRENT_MINUTE:$CURRENT_SECOND}
 	// Modified: ${6:$CURRENT_YEAR-$CURRENT_MONTH-$CURRENT_DATE $CURRENT_HOUR:$CURRENT_MINUTE:$CURRENT_SECOND}
 	// ===========================================================================
@@ -2711,6 +2711,41 @@ snippet extern_report "extern report_phase"
 snippet extern_final "extern final_phase"
 	extern virtual function void final_phase(uvm_phase phase);
 
+# ----------------------------------------------------------------------
+# UVM TASK PHASES (extern Declarations - Inside Class)
+# Trigger: extern_ (for extern declaration)
+# ----------------------------------------------------------------------
+
+snippet extern_prst "extern pre_reset_phase declaration"
+	extern task pre_reset_phase(uvm_phase phase);
+
+snippet extern_rst "extern reset_phase declaration"
+	extern task reset_phase(uvm_phase phase);
+
+snippet extern_postrst "extern post_reset_phase declaration"
+	extern task post_reset_phase(uvm_phase phase);
+
+snippet extern_pcfg "extern pre_configure_phase declaration"
+	extern task pre_configure_phase(uvm_phase phase);
+
+snippet extern_cfg "extern configure_phase declaration"
+	extern task configure_phase(uvm_phase phase);
+
+snippet extern_postcfg "extern post_configure_phase declaration"
+	extern task post_configure_phase(uvm_phase phase);
+
+snippet extern_pmain "extern pre_main_phase declaration"
+	extern task pre_main_phase(uvm_phase phase);
+
+snippet extern_main "extern main_phase declaration"
+	extern task main_phase(uvm_phase phase);
+
+snippet extern_postmain "extern post_main_phase declaration"
+	extern task post_main_phase(uvm_phase phase);
+
+snippet extern_run "extern run_phase declaration"
+	extern task run_phase(uvm_phase phase);	
+
 # ============================================================================
 # OUT-OF-BODY IMPLEMENTATION (Extern Method Implementation)
 # Usage: Use these AFTER 'endclass' to implement extern methods.
@@ -2748,12 +2783,6 @@ snippet start_of_simulation_impl "Impl: start_of_simulation_phase"
 		${2}
 	endfunction: start_of_simulation_phase
 
-snippet run_impl "Impl: run_phase"
-	task ${1:$TM_FILENAME_BASE}::run_phase(uvm_phase phase);
-		super.run_phase(phase);
-		${2}
-	endtask: run_phase
-
 snippet extract_impl "Impl: extract_phase"
 	function void ${1:$TM_FILENAME_BASE}::extract_phase(uvm_phase phase);
 		super.extract_phase(phase);
@@ -2779,7 +2808,109 @@ snippet final_impl "Impl: final_phase"
 	endfunction: final_phase
 
 # --- Runtime Phases (12 Sub-Phases) ---
+# ----------------------------------------------------------------------
+# UVM TASK PHASES (Trigger: _impl, Scoped: ${1:TM_FILENAME_BASE}::)
+# ----------------------------------------------------------------------
 
+# 9. pre_reset_phase
+snippet prst_impl "UVM pre_reset_phase implementation"
+	task ${1:TM_FILENAME_BASE}::pre_reset_phase(uvm_phase phase);
+		super.pre_reset_phase(phase);
+		phase.raise_objection(this);
+		uvm_info("${1:TM_FILENAME_BASE}::PRST", "Starting pre-reset phase.", uvm_pkg::UVM_LOW);
+		${2}
+		phase.drop_objection(this);
+	endtask : pre_reset_phase
+
+# 10. reset_phase
+snippet reset_impl "UVM reset_phase implementation"
+	task ${1:TM_FILENAME_BASE}::reset_phase(uvm_phase phase);
+		super.reset_phase(phase);
+		phase.raise_objection(this);
+		uvm_info("${1:TM_FILENAME_BASE}::RESET", "Starting reset phase.", uvm_pkg::UVM_LOW);
+		${2}
+		phase.drop_objection(this);
+	endtask : reset_phase
+
+# 11. post_reset_phase
+snippet postrst_impl "UVM post_reset_phase implementation"
+	task ${1:TM_FILENAME_BASE}::post_reset_phase(uvm_phase phase);
+		super.post_reset_phase(phase);
+		phase.raise_objection(this);
+		uvm_info("${1:TM_FILENAME_BASE}::POST_RST", "Starting post-reset phase.", uvm_pkg::UVM_LOW);
+		${2}
+		phase.drop_objection(this);
+	endtask : post_reset_phase
+
+# 12. pre_configure_phase
+snippet pcfg_impl "UVM pre_configure_phase implementation"
+	task ${1:TM_FILENAME_BASE}::pre_configure_phase(uvm_phase phase);
+		super.pre_configure_phase(phase);
+		phase.raise_objection(this);
+		uvm_info("${1:TM_FILENAME_BASE}::PCFG", "Starting pre-configure phase.", uvm_pkg::UVM_LOW);
+		${2}
+		phase.drop_objection(this);
+	endtask : pre_configure_phase
+
+# 13. configure_phase
+snippet cfg_impl "UVM configure_phase implementation"
+	task ${1:TM_FILENAME_BASE}::configure_phase(uvm_phase phase);
+		super.configure_phase(phase);
+		phase.raise_objection(this);
+		uvm_info("${1:TM_FILENAME_BASE}::CFG", "Starting configure phase.", uvm_pkg::UVM_LOW);
+		${2}
+		phase.drop_objection(this);
+	endtask : configure_phase
+
+# 14. post_configure_phase
+snippet postcfg_impl "UVM post_configure_phase implementation"
+	task ${1:TM_FILENAME_BASE}::post_configure_phase(uvm_phase phase);
+		super.post_configure_phase(phase);
+		phase.raise_objection(this);
+		uvm_info("${1:TM_FILENAME_BASE}::POST_CFG", "Starting post-configure phase.", uvm_pkg::UVM_LOW);
+		${2}
+		phase.drop_objection(this);
+	endtask : post_configure_phase
+
+# 15. pre_main_phase
+snippet pmain_impl "UVM pre_main_phase implementation"
+	task ${1:TM_FILENAME_BASE}::pre_main_phase(uvm_phase phase);
+		super.pre_main_phase(phase);
+		phase.raise_objection(this);
+		uvm_info("${1:TM_FILENAME_BASE}::PRE_MAIN", "Starting pre-main phase.", uvm_pkg::UVM_LOW);
+		${2}
+		phase.drop_objection(this);
+	endtask : pre_main_phase
+
+# 16. main_phase
+snippet main_impl "UVM main_phase implementation"
+	task ${1:TM_FILENAME_BASE}::main_phase(uvm_phase phase);
+		super.main_phase(phase);
+		phase.raise_objection(this);
+		uvm_info("${1:TM_FILENAME_BASE}::MAIN", "Starting main phase.", uvm_pkg::UVM_LOW);
+		${2}
+		phase.drop_objection(this);
+	endtask : main_phase
+
+# 17. post_main_phase
+snippet postmain_impl "UVM post_main_phase implementation"
+	task ${1:TM_FILENAME_BASE}::post_main_phase(uvm_phase phase);
+		super.post_main_phase(phase);
+		phase.raise_objection(this);
+		uvm_info("${1:TM_FILENAME_BASE}::POST_MAIN", "Starting post-main phase.", uvm_pkg::UVM_LOW);
+		${2}
+		phase.drop_objection(this);
+	endtask : post_main_phase
+
+# 18. run_phase (总的 run_phase)
+snippet run_impl "UVM run_phase implementation"
+	task ${1:TM_FILENAME_BASE}::run_phase(uvm_phase phase);
+		super.run_phase(phase);
+		phase.raise_objection(this);
+		uvm_info("${1:TM_FILENAME_BASE}::RUN", "Starting run phase sequence.", uvm_pkg::UVM_LOW);
+		${2}
+		phase.drop_objection(this);
+	endtask : run_phase
 # ============================================================================
 # OUT-OF-BODY IMPLEMENTATION (Extern Method Implementation)
 # Usage: Use these AFTER 'endclass' to implement extern methods.
